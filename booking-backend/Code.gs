@@ -276,7 +276,7 @@ function approveSelectedRequest() {
   try {
     video = createDailySession_(req);
   } catch (err) {
-    ui.alert('Could not create the video room', String(err.message || err) + '\n\nNo appointment status was changed. Check your Daily API key and try again.');
+    ui.alert('Could not create the video room:\n\n' + String(err.message || err) + '\n\nNo appointment status was changed. Check your Daily API key and try again.');
     return;
   }
 
