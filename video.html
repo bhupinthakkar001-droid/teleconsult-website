@@ -18,7 +18,7 @@
 .statuscard{width:min(480px,100%);background:#fff;border:1px solid var(--line);border-radius:24px;padding:28px;box-shadow:0 18px 55px #18382b0c}
 .mark{width:46px;height:46px;background:var(--pale);color:var(--green);border-radius:15px;display:grid;place-items:center;font-size:24px;margin-bottom:16px}
 h1{font-size:27px;letter-spacing:-.045em;line-height:1.12;margin:0 0 10px}.desc{font-size:14px;color:var(--muted);line-height:1.6;margin:0}
-.small{font-size:12px;color:var(--muted);margin-top:17px}
+.small{font-size:12px;color:var(--muted);margin-top:17px}.fallback{display:none;margin-top:16px;text-decoration:none;text-align:center;background:var(--green);color:#fff;padding:13px 16px;border-radius:12px;font-weight:750}.fallback.show{display:block}.debug{display:none;margin-top:10px;padding:10px;border-radius:10px;background:#fff7ed;color:#8a3c0b;font:12px/1.5 ui-monospace,monospace;overflow-wrap:anywhere}.debug.show{display:block}
 @media(max-width:480px){.topbar{padding:0 14px}.sub{max-width:230px}.badge{font-size:11px;padding:6px 8px}.statuscard{padding:23px}}
 </style>
 <script crossorigin src="https://unpkg.com/@daily-co/daily-js"></script>
@@ -33,7 +33,7 @@ h1{font-size:27px;letter-spacing:-.045em;line-height:1.12;margin:0 0 10px}.desc{
     <div class="mark">◉</div>
     <h1 id="statusTitle">Preparing your consultation…</h1>
     <p id="statusText" class="desc">Checking your secure video link. Please keep this page open.</p>
-    <p class="small">Allow camera and microphone access when your browser asks. Do not share this private joining link with anyone else.</p>
+    <p class="small">Allow camera and microphone access when your browser asks. Do not share this private joining link with anyone else.</p><a id="fallbackLink" class="fallback" target="_blank" rel="noopener noreferrer">Open video call directly</a><div id="debugText" class="debug"></div>
   </section>
 </main>
 <div id="call" aria-label="Video consultation"></div>
@@ -42,10 +42,27 @@ h1{font-size:27px;letter-spacing:-.045em;line-height:1.12;margin:0 0 10px}.desc{
   const statusWrap = document.getElementById('statusWrap');
   const title = document.getElementById('statusTitle');
   const text = document.getElementById('statusText');
-  function fail(heading, message) {
+  const fallbackLink = document.getElementById('fallbackLink');
+  const debugText = document.getElementById('debugText');
+  let directDailyUrl = '';
+  function fail(heading, message, details) {
     title.textContent = heading;
     text.textContent = message;
     statusWrap.style.display = 'grid';
+    if (directDailyUrl) {
+      fallbackLink.href = directDailyUrl;
+      fallbackLink.classList.add('show');
+    }
+    if (details) {
+      debugText.textContent = 'Daily diagnostic: ' + String(details).slice(0, 500);
+      debugText.classList.add('show');
+    }
+  }
+  function eventDetails(event) {
+    if (!event) return '';
+    return event.errorMsg ||
+      (event.error && (event.error.message || event.error.msg || event.error.type)) ||
+      event.message || event.type || '';
   }
   try {
     const params = new URLSearchParams(window.location.hash.replace(/^#/, ''));
@@ -65,6 +82,12 @@ h1{font-size:27px;letter-spacing:-.045em;line-height:1.12;margin:0 0 10px}.desc{
       fail('Invalid or incomplete video link', 'Please open the latest private consultation link sent by the doctor. If the problem continues, contact the doctor on WhatsApp.');
       return;
     }
+
+    // Daily also supports joining a private room directly with ?t=TOKEN.
+    // Offer this as a fallback if the embedded call fails.
+    roomUrl.searchParams.set('t', token);
+    directDailyUrl = roomUrl.toString();
+    roomUrl.searchParams.delete('t');
 
     const dailySdk = window.DailyIframe || window.Daily;
     if (!dailySdk || typeof dailySdk.createFrame !== 'function') {
@@ -87,34 +110,52 @@ h1{font-size:27px;letter-spacing:-.045em;line-height:1.12;margin:0 0 10px}.desc{
       }
     });
     let hasJoined = false;
+    frame.on('joining-meeting', function() {
+      title.textContent = 'Connecting to your consultation…';
+      text.textContent = 'Please wait while the secure video room connects.';
+      statusWrap.style.display = 'grid';
+    });
     frame.on('joined-meeting', function() {
       hasJoined = true;
       statusWrap.style.display = 'none';
       document.title = role === 'doctor' ? 'Doctor Consultation Room' : 'Patient Video Consultation';
     });
-    frame.on('left-meeting', function() {
+    frame.on('left-meeting', function(event) {
       statusWrap.style.display = 'grid';
       if (hasJoined) {
         title.textContent = 'You have left the consultation';
         text.textContent = 'You may close this page. To rejoin, reopen the original private video link.';
       } else {
-        title.textContent = 'Unable to join the consultation yet';
+        title.textContent = 'Unable to join the consultation';
         text.textContent = role === 'patient'
-          ? 'The patient link only becomes active shortly before the scheduled appointment. If it is already appointment time, refresh this page or ask the doctor for help.'
-          : 'The room did not connect. Check the appointment time, internet connection, and Daily configuration, then reopen your doctor link.';
+          ? 'The patient link may not be active yet, or Daily rejected the link. Try opening the call directly below.'
+          : 'Daily could not connect this doctor link. Try opening the call directly below.';
+        const detail = eventDetails(event);
+        if (detail) {
+          debugText.textContent = 'Daily diagnostic: ' + String(detail).slice(0, 500);
+          debugText.classList.add('show');
+        }
+        if (directDailyUrl) {
+          fallbackLink.href = directDailyUrl;
+          fallbackLink.classList.add('show');
+        }
       }
     });
-    frame.on('load-attempt-failed', function() {
-      fail('Could not connect to the video service', 'Check your internet connection and reopen the private consultation link. If the problem continues, contact the doctor.');
+    frame.on('load-attempt-failed', function(event) {
+      fail('Could not connect to the video service',
+        'The embedded player could not load Daily. Try opening the call directly below.',
+        eventDetails(event) || 'Daily iframe failed to load');
     });
-    frame.on('error', function() {
+    frame.on('error', function(event) {
       if (!hasJoined) {
-        fail('Unable to join the consultation', 'Check the appointment time, internet connection, and camera/microphone permissions. If this is the doctor link, try redeploying the latest Apps Script version.');
+        fail('Unable to join the consultation',
+          'Daily rejected or could not connect this video link. Try opening the call directly below.',
+          eventDetails(event) || 'Daily reported a connection error');
       }
     });
     await frame.join({ url: roomUrl.toString(), token: token });
   } catch (err) {
-    fail('Unable to start video', 'Please reopen the private consultation link from WhatsApp. If the issue continues, contact the doctor.');
+    fail('Unable to start video', 'Please reopen the private consultation link from WhatsApp. Try opening the call directly below if available.', err && err.message ? err.message : String(err));
   }
 })();
 </script>
