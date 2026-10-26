@@ -12,7 +12,7 @@ const SLOT_HEADERS = [
 ];
 const REQUEST_HEADERS = [
   'requestId', 'slotId', 'date', 'time',
-  'patientName', 'patientPhone', 'status', 'requestedAt', 'decisionAt'
+  'patientName', 'patientPhone', 'visitType', 'status', 'requestedAt', 'decisionAt'
 ];
 
 function onOpen() {
@@ -79,8 +79,9 @@ function doPost(e) {
   const name = cleanText_(p.patientName, 80);
   const phone = cleanPhone_(p.phone);
   const slotId = cleanText_(p.slotId, 80);
+  const visitType = cleanText_(p.visitType, 40);
 
-  if (name.length < 2 || !/^\+?[0-9 ]{7,18}$/.test(phone) || !slotId) {
+  if (name.length < 2 || !/^\+?[0-9 ]{7,18}$/.test(phone) || !slotId || !['First consultation', 'Follow-up consultation'].includes(visitType)) {
     return receiptPage_('Check your details', 'Please return to the website and enter a valid name and mobile number.', '');
   }
   if (!DOCTOR_WHATSAPP || DOCTOR_WHATSAPP.indexOf('X') !== -1) {
@@ -121,7 +122,7 @@ function doPost(e) {
     ]]);
     requests.appendRow([
       requestId, slotId, String(chosen[1]), String(chosen[2]),
-      safeCell_(name), safeCell_(phone), 'PENDING', now, ''
+      safeCell_(name), safeCell_(phone), visitType, 'PENDING', now, ''
     ]);
 
     const msg = 'Hello Dr. Bhupin, I have requested an online consultation. ' +
@@ -188,7 +189,7 @@ function setSelectedRequestStatus_(newStatus) {
     return;
   }
   const req = reqSheet.getRange(row, 1, 1, REQUEST_HEADERS.length).getDisplayValues()[0];
-  if (String(req[6]).toUpperCase() !== 'PENDING') {
+  if (String(req[7]).toUpperCase() !== 'PENDING') {
     SpreadsheetApp.getUi().alert('This request is not pending.');
     return;
   }
@@ -215,8 +216,8 @@ function setSelectedRequestStatus_(newStatus) {
         slots.getRange(matchRow, 4).setValue('AVAILABLE');
       }
     }
-    reqSheet.getRange(row, 7).setValue(newStatus);
-    reqSheet.getRange(row, 9).setValue(now);
+    reqSheet.getRange(row, 8).setValue(newStatus);
+    reqSheet.getRange(row, 10).setValue(now);
     SpreadsheetApp.getUi().alert(
       newStatus === 'CONFIRMED'
         ? 'Request marked CONFIRMED. Please also confirm with the patient on WhatsApp.'
