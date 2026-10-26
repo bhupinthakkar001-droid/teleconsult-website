@@ -467,3 +467,29 @@ function escapeHtml_(value) {
   return String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;')
     .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
+
+/**
+ * Run this once from the Apps Script editor to force Calendar permission
+ * authorization and verify that the Calendar API can create an event.
+ * A temporary test event is deleted immediately afterward.
+ */
+function authorizeCalendarAccess() {
+  ScriptApp.requireScopes(ScriptApp.AuthMode.FULL, [
+    'https://www.googleapis.com/auth/calendar.events.owned'
+  ]);
+
+  const start = new Date(Date.now() + 2 * 60 * 1000);
+  const end = new Date(start.getTime() + 60 * 1000);
+  const testEvent = Calendar.Events.insert({
+    summary: 'Teleconsult permission test - auto deleted',
+    start: { dateTime: Utilities.formatDate(start, 'UTC', "yyyy-MM-dd'T'HH:mm:ss'Z'") },
+    end: { dateTime: Utilities.formatDate(end, 'UTC', "yyyy-MM-dd'T'HH:mm:ss'Z'") }
+  }, 'primary');
+
+  if (testEvent && testEvent.id) {
+    Calendar.Events.remove('primary', testEvent.id);
+  }
+  SpreadsheetApp.getUi().alert(
+    'Calendar permission is working. The temporary test event was removed. Return to Requests and retry the pending booking.'
+  );
+}
