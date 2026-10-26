@@ -1,6 +1,6 @@
 # Free slot-based booking setup
 
-This prototype uses a private Google Sheet plus Google Apps Script. The website will only show slots whose status is `AVAILABLE`; submitting a request changes the slot to `PENDING`, preventing another request for the same slot. The doctor confirms or declines the request through WhatsApp, then updates its status using the spreadsheet menu.
+The website reads available slots from a private Google Sheet through Google Apps Script. To keep setup simpler, submitting the booking form opens a WhatsApp message to the doctor with the patient's name, phone, selected slot, and appointment type. The patient must press Send. The request is not automatically written to the Requests tab and the slot is not automatically locked. After receiving a request, change its slot status to `PENDING` to hide it from the public calendar. If you confirm it on WhatsApp, change status to `CONFIRMED`; if you decline, change it back to `AVAILABLE`.
 
 ## 1. Create the private booking sheet
 
@@ -53,15 +53,16 @@ In the website's `index.html`, replace the placeholder `BOOKING_API_URL` with th
 
 ## 6. Review and approve requests
 
-1. A patient chooses a currently available slot and submits their name and phone number.
-2. The backend marks the slot `PENDING` and stores a request in the private Requests tab.
-3. The patient is offered a button to open WhatsApp with a prefilled request message to the doctor. The patient must tap Send in WhatsApp.
-4. Discuss and confirm or decline with the patient on WhatsApp.
-5. In the Requests tab, select the pending request row. Use **Teleconsult bookings → Approve selected request** or **Decline selected request**. This marks the request accordingly; an approved slot becomes `CONFIRMED`, while a declined slot is released back to `AVAILABLE`.
+1. A patient chooses a currently available slot and submits their name, phone, date, time, and appointment type.
+2. The website opens WhatsApp with a prefilled request message addressed to you. The patient must press **Send** in WhatsApp for you to receive it.
+3. Until you update the sheet, the slot remains visible. To avoid duplicate requests, open the **Slots** tab and change the requested slot's status in column D to `PENDING` as soon as you see the request.
+4. Confirm or decline with the patient on WhatsApp.
+5. If confirmed, change the slot status to `CONFIRMED`. If declined, change it back to `AVAILABLE` so it appears on the website again.
 
 ## Important limitations and privacy
 
 - This is an appointment-request workflow, not automatic confirmation. The appointment is confirmed only after you approve it and tell the patient on WhatsApp.
+- The current simplified website sends booking details to WhatsApp, not automatically to the Requests sheet. The Slots sheet status must be updated manually.
 - The free WhatsApp link opens a prefilled message; it does not send messages automatically. Do not enter patient symptoms or medical records in this booking form.
 - The spreadsheet must remain private, and access to it should be limited to you. Review privacy/consent language and applicable telemedicine requirements before accepting real patients.
 - Test with dummy information first. Test a duplicate request to verify the slot cannot be requested twice.
