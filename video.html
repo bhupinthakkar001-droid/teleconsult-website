@@ -72,7 +72,8 @@ h1{font-size:27px;letter-spacing:-.045em;line-height:1.12;margin:0 0 10px}.desc{
       return;
     }
 
-    const frame = dailySdk.createFrame({
+    const callContainer = document.getElementById('call');
+    const frame = dailySdk.createFrame(callContainer, {
       showLeaveButton: true,
       showFullscreenButton: true,
       iframeStyle: {
