@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#f4f7f4">
+<title>Secure Video Consultation | Dr. Bhupin Thakkar</title>
+<style>
+:root{--ink:#19362d;--muted:#687970;--green:#21634c;--pale:#e6efe8;--line:#dfe8e1;--bg:#f4f7f4}
+*{box-sizing:border-box}html,body{height:100%;margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--ink);background:var(--bg)}
+.topbar{height:68px;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 22px;gap:14px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:800;letter-spacing:-.025em}.logo{width:38px;height:38px;border-radius:13px;background:var(--pale);display:grid;place-items:center;color:var(--green);font-size:21px}
+.sub{font-size:12px;color:var(--muted);font-weight:500;letter-spacing:0}
+.badge{font-size:12px;color:var(--green);background:var(--pale);border-radius:999px;padding:7px 11px;font-weight:700}
+#call{position:fixed;top:68px;left:0;width:100%;height:calc(100% - 68px);background:var(--bg)}
+#statusWrap{position:fixed;inset:68px 0 0;display:grid;place-items:center;padding:22px;z-index:5;background:var(--bg)}
+.statuscard{width:min(480px,100%);background:#fff;border:1px solid var(--line);border-radius:24px;padding:28px;box-shadow:0 18px 55px #18382b0c}
+.mark{width:46px;height:46px;background:var(--pale);color:var(--green);border-radius:15px;display:grid;place-items:center;font-size:24px;margin-bottom:16px}
+h1{font-size:27px;letter-spacing:-.045em;line-height:1.12;margin:0 0 10px}.desc{font-size:14px;color:var(--muted);line-height:1.6;margin:0}
+.small{font-size:12px;color:var(--muted);margin-top:17px}
+@media(max-width:480px){.topbar{padding:0 14px}.sub{max-width:230px}.badge{font-size:11px;padding:6px 8px}.statuscard{padding:23px}}
+</style>
+<script crossorigin src="https://unpkg.com/@daily-co/daily-js"></script>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><span class="logo">✚</span><span>Dr. Bhupin Thakkar<div class="sub">Secure video consultation · Internal Medicine</div></span></div>
+  <span class="badge">Private visit</span>
+</header>
+<main id="statusWrap">
+  <section class="statuscard">
+    <div class="mark">◉</div>
+    <h1 id="statusTitle">Preparing your consultation…</h1>
+    <p id="statusText" class="desc">Checking your secure video link. Please keep this page open.</p>
+    <p class="small">Allow camera and microphone access when your browser asks. Do not share this private joining link with anyone else.</p>
+  </section>
+</main>
+<div id="call" aria-label="Video consultation"></div>
+<script>
+(async function(){
+  const statusWrap = document.getElementById('statusWrap');
+  const title = document.getElementById('statusTitle');
+  const text = document.getElementById('statusText');
+  function fail(heading, message) {
+    title.textContent = heading;
+    text.textContent = message;
+    statusWrap.style.display = 'grid';
+  }
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const room = params.get('room') || '';
+    const token = params.get('token') || '';
+    const role = params.get('role') === 'doctor' ? 'doctor' : 'patient';
+
+    // Remove the bearer token from the visible address bar after reading it.
+    // The token remains in memory for this page only.
+    try { window.history.replaceState({}, document.title, window.location.pathname); } catch (ignored) {}
+
+    let roomUrl;
+    try { roomUrl = new URL(room); } catch (ignored) { roomUrl = null; }
+    if (!roomUrl || roomUrl.protocol !== 'https:' ||
+        !roomUrl.hostname.toLowerCase().endsWith('.daily.co') ||
+        !roomUrl.pathname || roomUrl.pathname === '/' || !token) {
+      fail('Invalid or incomplete video link', 'Please open the latest private consultation link sent by the doctor. If the problem continues, contact the doctor on WhatsApp.');
+      return;
+    }
+
+    const dailySdk = window.DailyIframe || window.Daily;
+    if (!dailySdk || typeof dailySdk.createFrame !== 'function') {
+      fail('Video service did not load', 'Check your internet connection and refresh using the original link. If the problem continues, contact the doctor.');
+      return;
+    }
+
+    const frame = dailySdk.createFrame({
+      showLeaveButton: true,
+      showFullscreenButton: true,
+      iframeStyle: {
+        position: 'fixed',
+        top: '68px',
+        left: '0',
+        width: '100%',
+        height: 'calc(100% - 68px)',
+        border: '0',
+        backgroundColor: '#f4f7f4'
+      }
+    });
+    frame.on('joined-meeting', function() {
+      statusWrap.style.display = 'none';
+      document.title = role === 'doctor' ? 'Doctor Consultation Room' : 'Patient Video Consultation';
+    });
+    frame.on('left-meeting', function() {
+      statusWrap.style.display = 'grid';
+      title.textContent = 'You have left the consultation';
+      text.textContent = 'You may close this page. To rejoin, reopen the original private video link.';
+    });
+    frame.on('error', function() {
+      fail('Unable to join the consultation', 'Check your internet connection, camera and microphone permissions, and appointment time. If you still cannot join, contact the doctor.');
+    });
+    await frame.join({ url: roomUrl.toString(), token: token });
+  } catch (err) {
+    fail('Unable to start video', 'Please reopen the private consultation link from WhatsApp. If the issue continues, contact the doctor.');
+  }
+})();
+</script>
+</body>
+</html>
