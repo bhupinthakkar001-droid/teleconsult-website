@@ -117,6 +117,9 @@ function loadSlots(){
     setNoSlots('The booking calendar is not connected yet. Please contact the doctor directly.');
     return;
   }
+  form.action=BOOKING_API_URL;
+  form.method='post';
+  form.target='_blank';
   dateSelect.innerHTML='<option value="">Loading slots…</option>';
   window.receiveTeleconsultSlots=function(payload){
     if(!payload||!payload.ok||!Array.isArray(payload.slots)){
