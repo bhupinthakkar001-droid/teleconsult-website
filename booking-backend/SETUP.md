@@ -11,9 +11,11 @@ This prototype uses a private Google Sheet plus Google Apps Script. The website 
 
 ## 2. Add the backend code
 
+The booking script is set up to route patient approval conversations to the WhatsApp contact configured for the doctor. The patient must tap the WhatsApp button and press Send; WhatsApp messages are not sent automatically by this free setup.
+
 1. Open `booking-backend/Code.gs` in this repository.
 2. Copy its complete contents into the Apps Script editor's `Code.gs`, replacing the starter code.
-3. At the top of the script, replace `91XXXXXXXXXX` with the doctor's WhatsApp number: country code and number, digits only, no plus sign or spaces.
+3. The doctor's WhatsApp number is already configured in the repository copy of the script. If you prefer to keep your contact number out of the public GitHub source, change the `DOCTOR_WHATSAPP` line to a placeholder before publishing this repository and enter your actual number only in the private Apps Script editor. The number must be country code + number, digits only, without a plus sign or spaces.
 4. Click Save.
 5. In the function dropdown, select `setupBookingSystem` and click Run. Approve the permissions requested by Google.
 6. Return to your spreadsheet and reload it. It should contain `Slots` and `Requests` tabs, plus a **Teleconsult bookings** menu.
