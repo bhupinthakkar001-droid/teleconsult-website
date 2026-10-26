@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#f4f7f4">
+<meta name="referrer" content="no-referrer">
 <title>Secure Video Consultation | Dr. Bhupin Thakkar</title>
 <style>
 :root{--ink:#19362d;--muted:#687970;--green:#21634c;--pale:#e6efe8;--line:#dfe8e1;--bg:#f4f7f4}
@@ -47,13 +48,13 @@ h1{font-size:27px;letter-spacing:-.045em;line-height:1.12;margin:0 0 10px}.desc{
     statusWrap.style.display = 'grid';
   }
   try {
-    const params = new URLSearchParams(window.location.search);
+    const params = new URLSearchParams(window.location.hash.replace(/^#/, ''));
     const room = params.get('room') || '';
     const token = params.get('token') || '';
     const role = params.get('role') === 'doctor' ? 'doctor' : 'patient';
 
-    // Remove the bearer token from the visible address bar after reading it.
-    // The token remains in memory for this page only.
+    // Credentials are passed in the URL fragment, not in the HTTP request to GitHub Pages.
+    // Clear the fragment from the address bar once loaded; the token stays in memory only.
     try { window.history.replaceState({}, document.title, window.location.pathname); } catch (ignored) {}
 
     let roomUrl;
