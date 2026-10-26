@@ -4,8 +4,8 @@ const TIME_ZONE = 'Asia/Kolkata';
 const SLOTS_SHEET = 'Slots';
 const REQUESTS_SHEET = 'Requests';
 
-// Replace this with your WhatsApp number including country code, digits only.
-// Example format: 919876543210
+// Enter your WhatsApp number here in your PRIVATE Apps Script editor only.
+// Use country code + number, digits only. Do not put the real number in public GitHub code.
 const DOCTOR_WHATSAPP = '91XXXXXXXXXX';
 
 const SLOT_HEADERS = [
@@ -44,21 +44,19 @@ function setupBookingSystem() {
   requests.getRange('A:F').setNumberFormat('@');
 
   SpreadsheetApp.getUi().alert(
-    'Setup complete.\n\nIn the Slots sheet, add one row per appointment slot. ' +
-    'Use date format YYYY-MM-DD, times such as 10:00 AM, and status AVAILABLE. ' +
-    'Keep this spreadsheet private.'
+    'Setup complete. Add one row per appointment to the Slots tab. ' +
+    'Use date YYYY-MM-DD, time like 10:00 AM, and status AVAILABLE. Keep this sheet private.'
   );
 }
 
 function doGet(e) {
-  const params = (e && e.parameter) || {};
-  if (params.action !== 'slots') {
+  const p = (e && e.parameter) || {};
+  if (String(p.action || '') !== 'slots') {
     return jsonOutput({ ok: true, message: 'Teleconsult booking service is running.' });
   }
 
-  const slots = getPublicSlots_();
-  const payload = JSON.stringify({ ok: true, slots: slots });
-  const callback = String(params.callback || '');
+  const payload = JSON.stringify({ ok: true, slots: getPublicSlots_() });
+  const callback = String(p.callback || '');
   if (callback && /^[A-Za-z_$][0-9A-Za-z_$]*$/.test(callback)) {
     return ContentService.createTextOutput(callback + '(' + payload + ');')
       .setMimeType(ContentService.MimeType.JAVASCRIPT);
@@ -70,82 +68,111 @@ function doGet(e) {
 function doPost(e) {
   const p = (e && e.parameter) || {};
   if (String(p.action || '') !== 'request') {
-    return receiptPage_('Request not submitted', 'This link is for appointment requests. Please return to the website and try again.', '');
+    return receiptPage_('Request not submitted', 'Please return to the website and try again.', '');
   }
-
-  // Honeypot field: real patients should leave it empty.
   if (String(p.website || '').trim()) {
     return receiptPage_('Unable to submit', 'Please return to the website and try again.', '');
   }
 
   const name = cleanText_(p.patientName, 80);
   const phone = cleanPhone_(p.phone);
-  const slotId = cleanText_(p.slotId || p.time, 80);
-  const visitType = cleanText_(p.visitTy  if (name.length < 2) {
-    return receiptPage_('Check your name', 'Please return to the website and enter your full name.', '');
+  const phoneDigits = phone.replace(/\D/g, '');
+  const slotId = cleanText_(p.slotId, 80);
+  const visitType = cleanText_(p.visitType, 40);
+
+  if (name.length < 2) {
+    return receiptPage_('Check your name', 'Please enter your full name and try again.', '');
   }
-  if (!/^\\+?[0-9 ]{7,18}$/.test(phone)) {
-    return receiptPage_('Check your mobile number', 'Enter a valid mobile number using digits. You can include +91 if needed.', '');
+  if (phoneDigits.length < 10 || phoneDigits.length > 15) {
+    return receiptPage_('Check your mobile number', 'Please enter a valid mobile number and try again.', '');
   }
   if (!slotId) {
-    return receiptPage_('Choose an appointment time', 'Please return to the website, select an available time, and try again.', '');
+    return receiptPage_('Choose an appointment time', 'Please return to the website and choose an available time.', '');
   }
   if (!['First consultation', 'Follow-up consultation'].includes(visitType)) {
-    return receiptPage_('Choose appointment type', 'Please return to the website and select first consultation or follow-up.', '');
-  }, '');
+    return receiptPage_('Choose appointment type', 'Please choose first consultation or follow-up.', '');
   }
-  if (!DOCTOR_WHATSAPP || DOCTOR_WHATSAPP.indexOf('X') !== -1) {
-    return receiptPage_('Booking setup incomplete', 'The booking service has not yet been fully configured. Please try again later.', '');
+  if (!/^\d{10,15}$/.test(DOCTOR_WHATSAPP)) {
+    return receiptPage_('Booking setup incomplete', 'The doctor is still setting up WhatsApp confirmation. Please try again later.', '');
   }
 
   const lock = LockService.getScriptLock();
+  let sheet = null;
+  let rowIndex = 0;
+  let reserved = false;
   try {
     lock.waitLock(10000);
     const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const sheet = ss.getSheetByName(SLOTS_SHEET);
+    sheet = ss.getSheetByName(SLOTS_SHEET);
     const requests = ss.getSheetByName(REQUESTS_SHEET);
     if (!sheet || !requests || sheet.getLastRow() < 2) {
-      return receiptPage_('Bookings are not open yet', 'No appointment slots are currently available. Please check again later.', '');
+      return receiptPage_('No appointment slots available', 'Please check again later or contact the doctor.', '');
     }
 
     const rows = sheet.getDataRange().getDisplayValues();
-    let rowIndex = -1;
     let chosen = null;
     for (let i = 1; i < rows.length; i++) {
-      if (String(rows[i][0]) === slotId) {
+      if (String(rows[i][0]).trim() === slotId) {
         rowIndex = i + 1;
         chosen = rows[i];
         break;
       }
     }
 
-    if (!chosen || String(chosen[3]).toUpperCase() !== 'AVAILABLE' ||
-        !/^\d{4}-\d{2}-\d{2}$/.test(String(chosen[1])) ||
-        String(chosen[1]) < todayString_()) {
-      return receiptPage_('That slot is no longer available', 'Someone may have requested this time first. Please return to the website and choose another available slot.', '');
+    if (!chosen || String(chosen[3]).trim().toUpperCase() !== 'AVAILABLE' ||
+        !/^\d{4}-\d{2}-\d{2}$/.test(String(chosen[1]).trim()) ||
+        String(chosen[1]).trim() < todayString_()) {
+      return receiptPage_(
+        'That slot is no longer available',
+        'Another patient may have requested this time. Please return to the website and choose another slot.',
+        ''
+      );
     }
 
     const requestId = Utilities.getUuid().slice(0, 8).toUpperCase();
     const now = Utilities.formatDate(new Date(), TIME_ZONE, 'yyyy-MM-dd HH:mm:ss');
+
+    // Lock the slot first so it disappears from the public calendar immediately.
     sheet.getRange(rowIndex, 4, 1, 5).setValues([[
       'PENDING', safeCell_(name), safeCell_(phone), now, requestId
     ]]);
+    reserved = true;
+
     requests.appendRow([
       requestId, slotId, String(chosen[1]), String(chosen[2]),
       safeCell_(name), safeCell_(phone), visitType, 'PENDING', now, ''
     ]);
 
-    const msg = 'Hello Dr. Bhupin, I have requested an online consultation. ' +
-      'Name: ' + name + '. Preferred slot: ' + chosen[1] + ' at ' + chosen[2] +
-      '. Request ID: ' + requestId + '. Please confirm availability.';
+    const msg = [
+      'Hello Dr. Bhupin, I am requesting a video consultation.',
+      'Name: ' + name,
+      'Mobile: ' + phone,
+      'Preferred date: ' + chosen[1],
+      'Preferred time: ' + chosen[2],
+      'Appointment type: ' + visitType,
+      'Request ID: ' + requestId,
+      '',
+      'Please confirm or decline this request. I understand it is not confirmed until you approve it.'
+    ].join('\n');
+
     const waUrl = 'https://wa.me/' + DOCTOR_WHATSAPP + '?text=' + encodeURIComponent(msg);
     return receiptPage_(
       'Request received',
-      'Your requested slot is held as PENDING while the doctor reviews it. It is not confirmed until the doctor replies to you on WhatsApp.',
+      'Your request has been saved and this slot is now held as PENDING, so other patients will no longer see it. Tap below and press Send in WhatsApp. Your appointment is confirmed only after the doctor approves it.',
       waUrl
     );
   } catch (err) {
-    return receiptPage_('Could not submit the request', 'Please try again later. If the problem continues, contact the doctor directly.', '');
+    if (reserved && sheet && rowIndex > 1) {
+      try {
+        sheet.getRange(rowIndex, 4, 1, 5).clearContent();
+        sheet.getRange(rowIndex, 4).setValue('AVAILABLE');
+      } catch (ignored) {}
+    }
+    return receiptPage_(
+      'Could not submit the request',
+      'No confirmation was made. Please return to the website and try again, or contact the doctor.',
+      ''
+    );
   } finally {
     try { lock.releaseLock(); } catch (ignored) {}
   }
@@ -190,7 +217,7 @@ function setSelectedRequestStatus_(newStatus) {
   const reqSheet = ss.getSheetByName(REQUESTS_SHEET);
   const active = ss.getActiveSheet();
   if (!reqSheet || active.getName() !== REQUESTS_SHEET) {
-    SpreadsheetApp.getUi().alert('Open the Requests sheet and select the pending request row first.');
+    SpreadsheetApp.getUi().alert('Open the Requests tab and select a pending request row first.');
     return;
   }
   const row = active.getActiveRange().getRow();
@@ -198,6 +225,7 @@ function setSelectedRequestStatus_(newStatus) {
     SpreadsheetApp.getUi().alert('Select a request row, not the header.');
     return;
   }
+
   const req = reqSheet.getRange(row, 1, 1, REQUEST_HEADERS.length).getDisplayValues()[0];
   if (String(req[7]).toUpperCase() !== 'PENDING') {
     SpreadsheetApp.getUi().alert('This request is not pending.');
@@ -217,6 +245,7 @@ function setSelectedRequestStatus_(newStatus) {
         break;
       }
     }
+
     const now = Utilities.formatDate(new Date(), TIME_ZONE, 'yyyy-MM-dd HH:mm:ss');
     if (matchRow > 0) {
       if (newStatus === 'CONFIRMED') {
@@ -251,7 +280,7 @@ function toMinutes_(time) {
 }
 
 function cleanText_(value, maxLength) {
-  return String(value || '').replace(/[<>\\u0000-\\u001F]/g, '').trim().slice(0, maxLength);
+  return String(value || '').replace(/[<>\u0000-\u001F]/g, '').trim().slice(0, maxLength);
 }
 
 function cleanPhone_(value) {
