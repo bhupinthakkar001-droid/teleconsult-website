@@ -412,10 +412,10 @@ function createDailySession_(req) {
   const patientName = cleanText_(req[4] || 'Patient', 80);
   const date = String(req[2] || '').trim();
   const time = String(req[3] || '').trim();
-  const startDate = Utilities.parseDate(date + ' ' + time, TIME_ZONE, 'yyyy-MM-dd hh:mm a');
+  const startDate = parseAppointmentDateTime_(date, time);
   const startEpoch = Math.floor(startDate.getTime() / 1000);
   const nowEpoch = Math.floor(Date.now() / 1000);
-  if (!startEpoch || startEpoch < nowEpoch - 3600) {
+  if (startEpoch < nowEpoch - 3600) {
     throw new Error('The selected appointment time appears to be in the past. Check the date/time in Requests before approving.');
   }
 
@@ -449,6 +449,42 @@ function createDailySession_(req) {
     patientLink: buildVideoPageLink_(roomUrl, patientToken, 'patient'),
     doctorLink: buildVideoPageLink_(roomUrl, doctorToken, 'doctor')
   };
+}
+
+function parseAppointmentDateTime_(dateValue, timeValue) {
+  const date = String(dateValue || '').trim();
+  const time = String(timeValue || '').trim();
+  const dm = date.match(/^(\\d{4})-(\\d{2})-(\\d{2})$/);
+  if (!dm) throw new Error('Invalid appointment date: ' + date + '. Use YYYY-MM-DD in the Requests tab.');
+
+  let hour;
+  let minute;
+  let tm = time.match(/^(\\d{1,2}):(\\d{2})\\s*(AM|PM)$/i);
+  if (tm) {
+    hour = Number(tm[1]) % 12;
+    minute = Number(tm[2]);
+    if (tm[3].toUpperCase() === 'PM') hour += 12;
+  } else {
+    // Google Sheets may display a time as 24-hour clock, for example 16:00.
+    tm = time.match(/^(\\d{1,2}):(\\d{2})$/);
+    if (!tm) throw new Error('Invalid appointment time: ' + time + '. Use 10:00 AM or 16:00 in the Requests tab.');
+    hour = Number(tm[1]);
+    minute = Number(tm[2]);
+  }
+
+  const year = Number(dm[1]);
+  const month = Number(dm[2]);
+  const day = Number(dm[3]);
+  if (hour < 0 || hour > 23 || minute < 0 || minute > 59) {
+    throw new Error('Invalid appointment time: ' + time);
+  }
+  const check = new Date(Date.UTC(year, month - 1, day, 0, 0, 0));
+  if (check.getUTCFullYear() !== year || check.getUTCMonth() !== month - 1 || check.getUTCDate() !== day) {
+    throw new Error('Invalid appointment date: ' + date);
+  }
+
+  // India is UTC+05:30. Convert the selected Kolkata local time to an absolute instant.
+  return new Date(Date.UTC(year, month - 1, day, hour, minute, 0) - (5.5 * 60 * 60 * 1000));
 }
 
 function createDailyToken_(apiKey, roomName, userName, isOwner, nbf, exp) {
