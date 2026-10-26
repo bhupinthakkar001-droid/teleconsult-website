@@ -4,7 +4,7 @@ const REQUESTS_SHEET = 'Requests';
 
 // Replace this with your WhatsApp number including country code, digits only.
 // Example format: 919876543210
-const DOCTOR_WHATSAPP = '91XXXXXXXXXX';
+const DOCTOR_WHATSAPP = '919877201716';
 
 const SLOT_HEADERS = [
   'slotId', 'date', 'time', 'status',
