@@ -1,3 +1,5 @@
+/** @OnlyCurrentDoc */
+
 const TIME_ZONE = 'Asia/Kolkata';
 const SLOTS_SHEET = 'Slots';
 const REQUESTS_SHEET = 'Requests';
