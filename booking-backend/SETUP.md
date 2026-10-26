@@ -1,41 +1,39 @@
-# Teleconsult booking + built-in video
+# Zero-cost teleconsult booking with automatic Google Meet links
 
-The website shows only appointment slots marked `AVAILABLE`. When a patient requests a slot, Apps Script marks it `PENDING` and saves it. When you approve it, Apps Script automatically creates a private Daily video room, generates separate patient and doctor access links, marks the appointment confirmed, and opens a WhatsApp message for you to send to the patient.
+The website displays only slots marked `AVAILABLE`. A patient request immediately changes the slot to `PENDING` and saves the request. When the doctor approves it, the script creates a unique Google Meet event/link in the doctor's Google Calendar, marks the booking confirmed, and prepares a WhatsApp message for the patient. No Daily API key or Daily payment method is needed.
+
+Note: the call opens in Google Meet rather than being embedded inside the website. This is the simplest zero-budget route. The Daily embedded-video integration was removed because Daily was blocking calls until a payment method was added.
 
 ## One-time setup
 
 1. Open [the latest Code.gs](https://raw.githubusercontent.com/bhupinthakkar001-droid/teleconsult-website/main/booking-backend/Code.gs).
 2. Copy all the code.
 3. Open the private **Teleconsult Bookings** Google Sheet → **Extensions → Apps Script**.
-4. Open `Code.gs`, select its contents, and replace it with the copied code.
-5. Press **Ctrl + S**.
-6. In the function dropdown, select `configureTeleconsultation` and click **Run**.
-7. When prompted, enter the doctor's WhatsApp number with country code (digits only), then paste the Daily API key from the Daily dashboard. Both are saved in private Apps Script properties; neither is placed in the public GitHub source. Never paste the Daily API key into GitHub or this chat.
-8. Select `setupBookingSystem` and click **Run** once. It creates or updates the `patientVideoLink` and `doctorVideoLink` columns in Requests and preserves existing rows.
-9. Click **Deploy → Manage deployments → pencil icon → New version → Deploy**. Keep the same `/exec` URL.
+4. Open `Code.gs`, select all, paste the copied code, and press **Ctrl + S**.
+5. In the left sidebar, find **Services** and click the **+**. Select **Google Calendar API**, version **v3**, then click **Add**. This enables the Calendar service used to create unique Meet links.
+6. In the Apps Script function dropdown, run `configureTeleconsultation` if you need to set or change your WhatsApp number. Enter country code + number, digits only. If your number was already saved in Script Properties from the previous setup, it remains there.
+7. Select `setupBookingSystem` and click **Run** once. It updates the Requests link header while preserving existing request rows and slots.
+8. Click **Deploy → Manage deployments → pencil icon → New version → Deploy**. Keep the existing `/exec` URL.
+9. If Google asks for additional permission to manage calendar events, review it and approve only if you recognize this script and the action you initiated.
 10. Refresh the website using **Ctrl + Shift + R**.
 
-Google may ask you to authorize external requests to Daily when you run the new code. Review the prompts, and only approve them if you recognize this project and the action you initiated.
+You do not need a Daily account or Daily API key for this version. Do not add a payment method to Daily just for this workflow.
 
-## Get your Daily API key
+## How the booking works
 
-Sign in to [Daily](https://dashboard.daily.co/). Open the developer/API-key area and copy your API key. The key goes only into the private Apps Script prompt in Step 7. Daily says the Video SDK starts with 10,000 free participant-minutes per month; check the current [Daily pricing page](https://www.daily.co/pricing/) and keep an eye on usage before taking real consultations.
+1. Add appointments to the **Slots** tab with a unique ID, date as `YYYY-MM-DD`, time such as `10:00 AM`, and status `AVAILABLE`.
+2. Patients see only currently available slots. A submitted request is stored as `PENDING`, and the slot is hidden from the public calendar.
+3. To approve, open **Requests**, select the pending row, and choose **Teleconsult bookings → Approve request & create Google Meet**.
+4. The script creates a unique Google Calendar event with a new Meet conference link. The appointment is marked confirmed, and the Meet URL is saved in the Requests tab's `videoLink` column.
+5. The confirmation dialog offers **Join Google Meet as doctor** and **Open WhatsApp to send patient link**. Send the prefilled WhatsApp message yourself; it is not sent automatically.
+6. To decline, select the pending request and choose **Teleconsult bookings → Decline selected request**. The slot becomes `AVAILABLE` again.
 
-## Daily workflow after setup
+The appointment appears on the doctor's primary Google Calendar. The script creates a 30-minute event starting at the selected appointment time. Check your Google Calendar time zone before using it with real patients.
 
-1. Add available appointments in the **Slots** tab: unique slot ID, date in `YYYY-MM-DD`, time such as `10:00 AM`, and status `AVAILABLE`.
-2. Patients see only `AVAILABLE` slots. On submission, the chosen slot becomes `PENDING` and is removed from the public list.
-3. To approve a request, open **Requests**, select the pending row, then choose **Teleconsult bookings → Approve request & create video room**.
-4. A private Daily room is created automatically. The row is marked `CONFIRMED`; the patient link is saved in column K and the doctor's link in column L.
-5. A dialog offers **Join as doctor** and **Open WhatsApp to send patient link**. Send the prefilled WhatsApp message yourself; WhatsApp does not send automatically.
-6. To decline a request, select its row and choose **Teleconsult bookings → Decline selected request**. The slot becomes `AVAILABLE` again.
+## Privacy and test checklist
 
-The doctor should open their own doctor link; do not forward it to the patient. The doctor can join early for setup; the patient's link becomes active 15 minutes before the booked time. The patient link is private and should only be sent to that patient. The room is private and tokens expire around the appointment time.
-
-## Important privacy and usage notes
-
-- Keep the Google Sheet private. It contains patient names and phone numbers.
-- Do not include symptoms or medical reports in the public booking form.
-- The website uses the Daily Prebuilt video interface embedded in `video.html`; the links contain short-lived access tokens.
-- Do not enable recording for clinical visits unless you have a lawful reason, proper patient consent, and secure retention arrangements.
-- Test end-to-end with dummy details before real patients use the system.
+- Keep the Google Sheet private; it contains patient names and mobile numbers.
+- Send the Meet link only to the patient whose appointment was confirmed.
+- Use a unique Meet conference per appointment; do not reuse meeting links.
+- Test with dummy details before taking real consultations.
+- This approach does not embed the actual Google Meet UI into your page; it opens the Google Meet call in a new tab.
