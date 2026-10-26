@@ -420,14 +420,17 @@ function createDailySession_(req) {
   }
 
   const roomName = 'consult-' + requestId + '-' + Utilities.getUuid().slice(0, 4).toLowerCase();
-  const nbf = Math.max(nowEpoch - 60, startEpoch - 15 * 60);
+  // Keep the private room joinable now so the doctor can test/join early.
+  // The patient token is still time-gated until 15 minutes before the appointment.
+  const roomNbf = nowEpoch - 60;
+  const patientNbf = Math.max(nowEpoch - 60, startEpoch - 15 * 60);
   const exp = Math.max(startEpoch + 2 * 60 * 60, nowEpoch + 30 * 60);
 
   const roomResponse = dailyApiRequest_('/rooms', {
     name: roomName,
     privacy: 'private',
     properties: {
-      nbf: nbf,
+      nbf: roomNbf,
       exp: exp,
       max_participants: 2,
       enable_prejoin_ui: true,
@@ -442,8 +445,8 @@ function createDailySession_(req) {
     throw new Error('Daily did not return a room URL. Check your Daily account and API key.');
   }
   const roomUrl = String(roomResponse.url);
-  const patientToken = createDailyToken_(apiKey, roomName, patientName, false, nbf, exp);
-  const doctorToken = createDailyToken_(apiKey, roomName, 'Dr. Bhupin Thakkar', true, nbf, exp);
+  const patientToken = createDailyToken_(apiKey, roomName, patientName, false, patientNbf, exp);
+  const doctorToken = createDailyToken_(apiKey, roomName, 'Dr. Bhupin Thakkar', true, roomNbf, exp);
 
   return {
     patientLink: buildVideoPageLink_(roomUrl, patientToken, 'patient'),
