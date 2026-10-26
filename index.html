@@ -162,6 +162,7 @@ function updateTimes(){
 dateSelect.addEventListener('change',updateTimes);
 timeSelect.addEventListener('change',()=>{slotInput.value=timeSelect.value});
 form.addEventListener('submit',e=>{
+  e.preventDefault();
   notice.classList.remove('show');
   if(!form.reportValidity()) return;
   if(!slotInput.value){
@@ -174,6 +175,7 @@ form.addEventListener('submit',e=>{
   showNotice('Your request is being submitted in a new tab. Follow the instructions there to continue to WhatsApp. The slot will be held as pending if the request is accepted.');
   submitButton.disabled=true;
   submitButton.textContent='Submitting request…';
+  form.submit();
 });
 loadSlots();
 </script>
