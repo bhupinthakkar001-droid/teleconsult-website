@@ -14,7 +14,7 @@ const SLOT_HEADERS = [
 ];
 const REQUEST_HEADERS = [
   'requestId', 'slotId', 'date', 'time',
-  'patientName', 'patientPhone', 'visitType', 'status', 'requestedAt', 'decisionAt'
+  'patientName', 'patientPhone', 'visitType', 'status', 'requestedAt', 'decisionAt', 'videoLink'
 ];
 
 function onOpen() {
@@ -33,7 +33,11 @@ function setupBookingSystem() {
   if (!requests) requests = ss.insertSheet(REQUESTS_SHEET);
 
   if (slots.getLastRow() === 0) slots.appendRow(SLOT_HEADERS);
-  if (requests.getLastRow() === 0) requests.appendRow(REQUEST_HEADERS);
+  if (requests.getLastRow() === 0) {
+    requests.appendRow(REQUEST_HEADERS);
+  } else if (!String(requests.getRange(1, 11).getDisplayValue()).trim()) {
+    requests.getRange(1, 11).setValue('videoLink');
+  }
 
   slots.setFrozenRows(1);
   requests.setFrozenRows(1);
@@ -205,30 +209,44 @@ function getPublicSlots_() {
 }
 
 function approveSelectedRequest() {
-  setSelectedRequestStatus_('CONFIRMED');
+  const ui = SpreadsheetApp.getUi();
+  const response = ui.prompt(
+    'Confirm appointment',
+    'Paste the Google Meet link for this appointment. The patient will receive it through WhatsApp.',
+    ui.ButtonSet.OK_CANCEL
+  );
+  if (response.getSelectedButton() !== ui.Button.OK) return;
+
+  const videoLink = String(response.getResponseText() || '').trim();
+  if (!/^https:\/\/meet\.google\.com\/[A-Za-z0-9-]+(?:\?.*)?$/.test(videoLink)) {
+    ui.alert('Please enter a valid Google Meet link beginning with https://meet.google.com/. No changes were made.');
+    return;
+  }
+  setSelectedRequestStatus_('CONFIRMED', videoLink);
 }
 
 function declineSelectedRequest() {
-  setSelectedRequestStatus_('DECLINED');
+  setSelectedRequestStatus_('DECLINED', '');
 }
 
-function setSelectedRequestStatus_(newStatus) {
+function setSelectedRequestStatus_(newStatus, videoLink) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const reqSheet = ss.getSheetByName(REQUESTS_SHEET);
   const active = ss.getActiveSheet();
+  const ui = SpreadsheetApp.getUi();
   if (!reqSheet || active.getName() !== REQUESTS_SHEET) {
-    SpreadsheetApp.getUi().alert('Open the Requests tab and select a pending request row first.');
+    ui.alert('Open the Requests tab and select a pending request row first.');
     return;
   }
   const row = active.getActiveRange().getRow();
   if (row < 2) {
-    SpreadsheetApp.getUi().alert('Select a request row, not the header.');
+    ui.alert('Select a request row, not the header.');
     return;
   }
 
   const req = reqSheet.getRange(row, 1, 1, REQUEST_HEADERS.length).getDisplayValues()[0];
   if (String(req[7]).toUpperCase() !== 'PENDING') {
-    SpreadsheetApp.getUi().alert('This request is not pending.');
+    ui.alert('This request is not pending.');
     return;
   }
 
@@ -257,14 +275,49 @@ function setSelectedRequestStatus_(newStatus) {
     }
     reqSheet.getRange(row, 8).setValue(newStatus);
     reqSheet.getRange(row, 10).setValue(now);
-    SpreadsheetApp.getUi().alert(
-      newStatus === 'CONFIRMED'
-        ? 'Request marked CONFIRMED. Please also confirm with the patient on WhatsApp.'
-        : 'Request declined and the slot has been made available again. Please notify the patient on WhatsApp.'
-    );
+
+    if (newStatus === 'CONFIRMED') {
+      reqSheet.getRange(row, 11).setValue(videoLink);
+      const patientName = String(req[4] || 'there');
+      const patientPhone = normalizeWhatsAppPhone_(req[5]);
+      const date = String(req[2] || '');
+      const time = String(req[3] || '');
+      const visitType = String(req[6] || 'Video consultation');
+      const message = [
+        'Hello ' + patientName + ', your video consultation with Dr. Bhupin is confirmed.',
+        'Date: ' + date,
+        'Time: ' + time,
+        'Appointment: ' + visitType,
+        'Join your consultation using this Google Meet link: ' + videoLink,
+        '',
+        'Please join a few minutes before the appointment. If you need to reschedule, please contact the doctor.'
+      ].join('\n');
+      const waUrl = 'https://wa.me/' + patientPhone + '?text=' + encodeURIComponent(message);
+
+      const dialogHtml = '<!doctype html><html><head><base target="_blank"><style>' +
+        'body{font:14px/1.5 Arial,sans-serif;padding:18px;color:#19362d}' +
+        'h2{font-size:20px;margin:0 0 8px}p{color:#596b62;margin:0 0 16px}' +
+        'a{display:block;text-align:center;background:#21634c;color:#fff;padding:12px 14px;border-radius:10px;text-decoration:none;font-weight:bold}' +
+        '.note{font-size:12px;margin-top:14px;color:#68776f}' +
+        '</style></head><body><h2>Appointment confirmed</h2>' +
+        '<p>Request ' + escapeHtml_(String(req[0])) + ' is marked CONFIRMED. A Google Meet link has been saved in the Requests tab.</p>' +
+        '<a href="' + escapeHtml_(waUrl) + '">Open WhatsApp to send confirmation →</a>' +
+        '<p class="note">WhatsApp opens with a prefilled message. Review it and press Send; the message is not sent automatically.</p>' +
+        '</body></html>';
+      ui.showModalDialog(HtmlService.createHtmlOutput(dialogHtml).setWidth(420).setHeight(270), 'Send patient confirmation');
+    } else {
+      ui.alert('Request declined and its slot is available again. Please notify the patient on WhatsApp.');
+    }
   } finally {
     lock.releaseLock();
   }
+}
+
+function normalizeWhatsAppPhone_(value) {
+  let digits = String(value || '').replace(/\D/g, '');
+  if (digits.length === 10) digits = '91' + digits;
+  else if (digits.length === 11 && digits.charAt(0) === '0') digits = '91' + digits.slice(1);
+  return digits;
 }
 
 function todayString_() {
