@@ -82,13 +82,14 @@ form{display:grid;gap:13px}.fields{display:grid;grid-template-columns:1fr 1fr;ga
       <div><label for="visitType">Appointment type</label><select id="visitType" name="visitType" required><option value="">Choose one</option><option>First consultation</option><option>Follow-up consultation</option></select></div>
       <input name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px" value="">
       <button class="submit" id="submitBooking" type="submit">Request Appointment</button>
-      <p class="fine">Your slot remains pending until you approve it and confirm with the patient on WhatsApp.</p>
+      <p class="fine">Your request will open in WhatsApp. The appointment is not confirmed until the doctor approves it.</p>
       <div class="notice" id="notice" role="status"></div>
     </form>
   </section>
 </div>
 <script>
 const BOOKING_API_URL = "https://script.google.com/macros/s/AKfycbwoLQKWUyfYFP9V3wlOPPazE11NbIrorXyWyHgbBMEGUCXo5Jd3E81AwfnDSQj5xAvD/exec";
+const DOCTOR_WHATSAPP = "919877201716";
 const apiReady = /^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec$/.test(BOOKING_API_URL);
 const modal=document.getElementById('modalWrap');
 const openBtn=document.getElementById('openBooking');
@@ -110,21 +111,17 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal()});
 function displayDate(iso){
   const parts=iso.split('-').map(Number);
   const d=new Date(parts[0],parts[1]-1,parts[2]);
-  return new Intl.DateTimeFormat('en-IN',{weekday:'short',day:'numeric',month:'short'}).format(d);
+  return new Intl.DateTimeFormat('en-IN',{weekday:'short',day:'numeric',month:'short',year:'numeric'}).format(d);
 }
 function loadSlots(){
   if(!apiReady){
-    dateSelect.innerHTML='<option value="">Calendar setup in progress</option>';
-    timeSelect.innerHTML='<option value="">Available times will appear here</option>';
-    dateSelect.disabled=true;timeSelect.disabled=true;submitButton.disabled=true;
-    showNotice('The live slot calendar is not connected yet. We are setting up the booking system.');
+    setNoSlots('The booking calendar is not connected yet. Please contact the doctor directly.');
     return;
   }
-  form.action=BOOKING_API_URL;
   dateSelect.innerHTML='<option value="">Loading slots…</option>';
   window.receiveTeleconsultSlots=function(payload){
     if(!payload||!payload.ok||!Array.isArray(payload.slots)){
-      setNoSlots('Could not load availability. Please refresh and try again.');return;
+      setNoSlots('Could not load availability. Please refresh the page or contact the doctor.');return;
     }
     availableSlots=payload.slots;
     const dates=[...new Set(availableSlots.map(s=>s.date))];
@@ -163,15 +160,33 @@ function updateTimes(){
 dateSelect.addEventListener('change',updateTimes);
 timeSelect.addEventListener('change',()=>{slotInput.value=timeSelect.value});
 form.addEventListener('submit',e=>{
+  e.preventDefault();
   notice.classList.remove('show');
-  if(!apiReady){
-    e.preventDefault();showNotice('The booking calendar is still being connected. No appointment request has been sent.');return;
+  if(!form.reportValidity()) return;
+  if(!slotInput.value){
+    showNotice('Please select an available date and time.');return;
   }
-  if(!slotInput.value||!availableSlots.some(s=>s.slotId===slotInput.value&&s.date===dateSelect.value)){
-    e.preventDefault();showNotice('Please select an available date and time before continuing.');return;
+  const chosen=availableSlots.find(s=>s.slotId===slotInput.value&&s.date===dateSelect.value);
+  if(!chosen){
+    showNotice('That slot is no longer available. Please refresh and select another time.');return;
   }
-  submitButton.disabled=true;
-  submitButton.textContent='Submitting request…';
+  const name=document.getElementById('patientName').value.trim();
+  const phone=document.getElementById('phone').value.trim();
+  const visitType=document.getElementById('visitType').value;
+  const message=[
+    'Hello Dr. Bhupin, I would like to request a video consultation.',
+    'Name: '+name,
+    'Mobile: '+phone,
+    'Preferred date: '+chosen.date,
+    'Preferred time: '+chosen.time,
+    'Appointment type: '+visitType,
+    '',
+    'Please confirm whether this slot is available. I understand this is a request and is not confirmed until you approve it.'
+  ].join('\n');
+  const waUrl='https://wa.me/'+DOCTOR_WHATSAPP+'?text='+encodeURIComponent(message);
+  showNotice('Opening WhatsApp with your appointment request. Please press Send in WhatsApp to send it to the doctor. Your appointment is not confirmed until the doctor approves it.');
+  const waWindow=window.open(waUrl,'_blank','noopener,noreferrer');
+  if(!waWindow){window.location.href=waUrl;}
 });
 loadSlots();
 </script>
