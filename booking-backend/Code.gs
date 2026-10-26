@@ -454,19 +454,19 @@ function createDailySession_(req) {
 function parseAppointmentDateTime_(dateValue, timeValue) {
   const date = String(dateValue || '').trim();
   const time = String(timeValue || '').trim();
-  const dm = date.match(/^(\\d{4})-(\\d{2})-(\\d{2})$/);
+  const dm = date.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (!dm) throw new Error('Invalid appointment date: ' + date + '. Use YYYY-MM-DD in the Requests tab.');
 
   let hour;
   let minute;
-  let tm = time.match(/^(\\d{1,2}):(\\d{2})\\s*(AM|PM)$/i);
+  let tm = time.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
   if (tm) {
     hour = Number(tm[1]) % 12;
     minute = Number(tm[2]);
     if (tm[3].toUpperCase() === 'PM') hour += 12;
   } else {
     // Google Sheets may display a time as 24-hour clock, for example 16:00.
-    tm = time.match(/^(\\d{1,2}):(\\d{2})$/);
+    tm = time.match(/^(\d{1,2}):(\d{2})$/);
     if (!tm) throw new Error('Invalid appointment time: ' + time + '. Use 10:00 AM or 16:00 in the Requests tab.');
     hour = Number(tm[1]);
     minute = Number(tm[2]);
