@@ -419,7 +419,7 @@ function createDailySession_(req) {
     throw new Error('The selected appointment time appears to be in the past. Check the date/time in Requests before approving.');
   }
 
-  const roomName = 'consult-' + requestId;
+  const roomName = 'consult-' + requestId + '-' + Utilities.getUuid().slice(0, 4).toLowerCase();
   const nbf = Math.max(nowEpoch - 60, startEpoch - 15 * 60);
   const exp = Math.max(startEpoch + 2 * 60 * 60, nowEpoch + 30 * 60);
 
@@ -491,7 +491,8 @@ function buildVideoPageLink_(roomUrl, token, role) {
   if (!/^https:\/\/[a-z0-9-]+\.daily\.co\/[A-Za-z0-9_-]+(?:\?.*)?$/i.test(safeRoomUrl)) {
     throw new Error('Daily returned a room URL in an unexpected format.');
   }
-  return VIDEO_PAGE_BASE + '?room=' + encodeURIComponent(safeRoomUrl) +
+  // Put bearer tokens in the URL fragment, which is not sent to the hosting server in HTTP requests.
+  return VIDEO_PAGE_BASE + '#room=' + encodeURIComponent(safeRoomUrl) +
     '&token=' + encodeURIComponent(token) + '&role=' + encodeURIComponent(role);
 }
 
