@@ -1,68 +1,44 @@
-# Free slot-based booking setup
+# Slot booking system — setup guide
 
-The website reads available slots from a private Google Sheet through Google Apps Script. To keep setup simpler, submitting the booking form opens a WhatsApp message to the doctor with the patient's name, phone, selected slot, and appointment type. The patient must press Send. The request is not automatically written to the Requests tab and the slot is not automatically locked. After receiving a request, change its slot status to `PENDING` to hide it from the public calendar. If you confirm it on WhatsApp, change status to `CONFIRMED`; if you decline, change it back to `AVAILABLE`.
+The website shows **only slots whose status is `AVAILABLE`**. When a patient submits a request, the booking script checks the slot again, marks it `PENDING`, and saves the request before offering the patient a WhatsApp button. This prevents a second patient from booking that same slot while you review it.
 
-## 1. Create the private booking sheet
+## One-time setup
 
-1. Sign in to the Google account you want to use for bookings.
-2. Create a new Google Sheet named **Teleconsult Bookings**.
-3. Keep the sheet private. Do not share it publicly; it will contain patients' names and phone numbers.
-4. In the sheet, choose **Extensions → Apps Script**.
+1. Open [Code.gs](https://raw.githubusercontent.com/bhupinthakkar001-droid/teleconsult-website/main/booking-backend/Code.gs).
+2. Copy all the code, then open the private **Teleconsult Bookings** Google Sheet and choose **Extensions → Apps Script**.
+3. In Apps Script, replace the existing `Code.gs` content with the new code.
+4. In the line `const DOCTOR_WHATSAPP = '91XXXXXXXXXX';`, put your WhatsApp number with country code, digits only. Keep the number only in this private Apps Script editor, not in public GitHub.
+5. Press **Ctrl + S**.
+6. Click **Deploy → Manage deployments**, click the pencil icon for the current web app, choose **New version**, and click **Deploy**. Keep using the same `/exec` URL.
+7. Open the website and refresh with **Ctrl + Shift + R**.
 
-## 2. Add the backend code
+You should not have to change the website URL if you are updating the existing deployment. The Google Sheet must remain private.
 
-The public repository keeps the doctor's WhatsApp number as a placeholder for privacy. Enter the doctor's number only inside your private Apps Script editor. The patient must tap the WhatsApp button and press Send; messages are not sent automatically by this free setup.
+## Adding appointments
 
-1. Open `booking-backend/Code.gs` in this repository.
-2. Copy its complete contents into the Apps Script editor's `Code.gs`, replacing the starter code.
-3. In your private Apps Script editor, set `DOCTOR_WHATSAPP` to your WhatsApp number using country code + number, digits only, without a plus sign or spaces. Do not put your personal number into the public GitHub repository.
-4. Click Save.
-5. In the function dropdown, select `setupBookingSystem` and click Run. Approve the permissions requested by Google.
-6. Return to your spreadsheet and reload it. It should contain `Slots` and `Requests` tabs, plus a **Teleconsult bookings** menu.
-
-## 3. Add the slots you want to offer
-
-In the **Slots** tab, add one row for every available appointment. Use these columns:
+In the **Slots** tab, add one row per appointment. Fill columns A–D only:
 
 | slotId | date | time | status |
 |---|---|---|---|
 | S001 | YYYY-MM-DD | 10:00 AM | AVAILABLE |
 | S002 | YYYY-MM-DD | 11:00 AM | AVAILABLE |
 
-- Use a unique ID for every slot.
-- Enter dates as text in `YYYY-MM-DD` format and times like `10:00 AM` or `04:30 PM`.
-- The status must be exactly `AVAILABLE`.
-- Leave columns E–H blank. Do not change slots already marked `PENDING` or `CONFIRMED` without checking the Requests tab.
+Use a unique slot ID; date format `YYYY-MM-DD`; time like `10:00 AM`; status exactly `AVAILABLE`. Columns E–H are filled when a patient requests a slot.
 
-You control the schedule: add slots when you want to open appointments and stop offering a date by removing its unbooked `AVAILABLE` rows. Do not delete rows that are pending or confirmed.
+## What happens when someone books
 
-## 4. Deploy the script as a web app
+1. Patient chooses a date and an available time.
+2. On submission, the server rechecks the slot while holding a lock. If another request already took it, the patient sees a message to choose another slot.
+3. If it is still available, the slot is immediately marked `PENDING` and the request is saved in the private **Requests** tab.
+4. The patient sees a **Continue to WhatsApp** button and must press **Send** to message you. WhatsApp is not sent automatically.
+5. After you approve the patient through WhatsApp, open the **Requests** tab, select that request's row, and use **Teleconsult bookings → Approve selected request**. The slot becomes `CONFIRMED` and stays hidden from patients.
+6. If you decline, use **Teleconsult bookings → Decline selected request**. The request is marked declined and the slot becomes `AVAILABLE` again.
 
-1. In Apps Script, click **Deploy → New deployment**.
-2. Choose the deployment type **Web app**.
-3. Set **Execute as** to **Me**.
-4. Set **Who has access** to **Anyone** (including users who aren't signed in, if that is the option shown).
-5. Click **Deploy** and complete the authorization steps.
-6. Copy the web app URL. It should end in `/exec`.
+The website exposes only the public list of available date/time slots. Patient names and phone numbers are stored in the private spreadsheet and are not returned by the public slot-list endpoint.
 
-Do not share the Apps Script editor or the Google Sheet with the public. Only the deployed web app should be public.
+## Important
 
-## 5. Connect the public website
-
-In the website's `index.html`, replace the placeholder `BOOKING_API_URL` with the deployed `/exec` URL. Save the file to `main` and wait for GitHub Pages to update.
-
-## 6. Review and approve requests
-
-1. A patient chooses a currently available slot and submits their name, phone, date, time, and appointment type.
-2. The website opens WhatsApp with a prefilled request message addressed to you. The patient must press **Send** in WhatsApp for you to receive it.
-3. Until you update the sheet, the slot remains visible. To avoid duplicate requests, open the **Slots** tab and change the requested slot's status in column D to `PENDING` as soon as you see the request.
-4. Confirm or decline with the patient on WhatsApp.
-5. If confirmed, change the slot status to `CONFIRMED`. If declined, change it back to `AVAILABLE` so it appears on the website again.
-
-## Important limitations and privacy
-
-- This is an appointment-request workflow, not automatic confirmation. The appointment is confirmed only after you approve it and tell the patient on WhatsApp.
-- The current simplified website sends booking details to WhatsApp, not automatically to the Requests sheet. The Slots sheet status must be updated manually.
-- The free WhatsApp link opens a prefilled message; it does not send messages automatically. Do not enter patient symptoms or medical records in this booking form.
-- The spreadsheet must remain private, and access to it should be limited to you. Review privacy/consent language and applicable telemedicine requirements before accepting real patients.
-- Test with dummy information first. Test a duplicate request to verify the slot cannot be requested twice.
+- Test the workflow using dummy details before sharing the site with patients.
+- Do not enter symptoms or medical reports into the booking form.
+- Keep the spreadsheet private and restrict access to you.
+- The slot remains pending until you approve/decline it. If a patient doesn't send the WhatsApp message, you can decline that request in the Requests tab to release the slot again.
