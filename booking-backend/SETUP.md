@@ -30,7 +30,7 @@ Sign in to [Daily](https://dashboard.daily.co/). Open the developer/API-key area
 5. A dialog offers **Join as doctor** and **Open WhatsApp to send patient link**. Send the prefilled WhatsApp message yourself; WhatsApp does not send automatically.
 6. To decline a request, select its row and choose **Teleconsult bookings → Decline selected request**. The slot becomes `AVAILABLE` again.
 
-The doctor should open their own doctor link; do not forward it to the patient. The patient link is private and should only be sent to that patient. The room is private and tokens expire around the appointment time.
+The doctor should open their own doctor link; do not forward it to the patient. The doctor can join early for setup; the patient's link becomes active 15 minutes before the booked time. The patient link is private and should only be sent to that patient. The room is private and tokens expire around the appointment time.
 
 ## Important privacy and usage notes
 
