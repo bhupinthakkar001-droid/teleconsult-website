@@ -82,14 +82,13 @@ form{display:grid;gap:13px}.fields{display:grid;grid-template-columns:1fr 1fr;ga
       <div><label for="visitType">Appointment type</label><select id="visitType" name="visitType" required><option value="">Choose one</option><option>First consultation</option><option>Follow-up consultation</option></select></div>
       <input name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px" value="">
       <button class="submit" id="submitBooking" type="submit">Request Appointment</button>
-      <p class="fine">Your request will open in WhatsApp. The appointment is not confirmed until the doctor approves it.</p>
+      <p class="fine">Your slot will be held as pending when you submit the form. The doctor must approve it before the appointment is confirmed.</p>
       <div class="notice" id="notice" role="status"></div>
     </form>
   </section>
 </div>
 <script>
 const BOOKING_API_URL = "https://script.google.com/macros/s/AKfycbwoLQKWUyfYFP9V3wlOPPazE11NbIrorXyWyHgbBMEGUCXo5Jd3E81AwfnDSQj5xAvD/exec";
-const DOCTOR_WHATSAPP = "919877201716";
 const apiReady = /^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec$/.test(BOOKING_API_URL);
 const modal=document.getElementById('modalWrap');
 const openBtn=document.getElementById('openBooking');
@@ -160,7 +159,6 @@ function updateTimes(){
 dateSelect.addEventListener('change',updateTimes);
 timeSelect.addEventListener('change',()=>{slotInput.value=timeSelect.value});
 form.addEventListener('submit',e=>{
-  e.preventDefault();
   notice.classList.remove('show');
   if(!form.reportValidity()) return;
   if(!slotInput.value){
@@ -170,23 +168,9 @@ form.addEventListener('submit',e=>{
   if(!chosen){
     showNotice('That slot is no longer available. Please refresh and select another time.');return;
   }
-  const name=document.getElementById('patientName').value.trim();
-  const phone=document.getElementById('phone').value.trim();
-  const visitType=document.getElementById('visitType').value;
-  const message=[
-    'Hello Dr. Bhupin, I would like to request a video consultation.',
-    'Name: '+name,
-    'Mobile: '+phone,
-    'Preferred date: '+chosen.date,
-    'Preferred time: '+chosen.time,
-    'Appointment type: '+visitType,
-    '',
-    'Please confirm whether this slot is available. I understand this is a request and is not confirmed until you approve it.'
-  ].join('\n');
-  const waUrl='https://wa.me/'+DOCTOR_WHATSAPP+'?text='+encodeURIComponent(message);
-  showNotice('Opening WhatsApp with your appointment request. Please press Send in WhatsApp to send it to the doctor. Your appointment is not confirmed until the doctor approves it.');
-  const waWindow=window.open(waUrl,'_blank','noopener,noreferrer');
-  if(!waWindow){window.location.href=waUrl;}
+  showNotice('Your request is being submitted in a new tab. Follow the instructions there to continue to WhatsApp. The slot will be held as pending if the request is accepted.');
+  submitButton.disabled=true;
+  submitButton.textContent='Submitting request…';
 });
 loadSlots();
 </script>
