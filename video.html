@@ -85,17 +85,31 @@ h1{font-size:27px;letter-spacing:-.045em;line-height:1.12;margin:0 0 10px}.desc{
         backgroundColor: '#f4f7f4'
       }
     });
+    let hasJoined = false;
     frame.on('joined-meeting', function() {
+      hasJoined = true;
       statusWrap.style.display = 'none';
       document.title = role === 'doctor' ? 'Doctor Consultation Room' : 'Patient Video Consultation';
     });
     frame.on('left-meeting', function() {
       statusWrap.style.display = 'grid';
-      title.textContent = 'You have left the consultation';
-      text.textContent = 'You may close this page. To rejoin, reopen the original private video link.';
+      if (hasJoined) {
+        title.textContent = 'You have left the consultation';
+        text.textContent = 'You may close this page. To rejoin, reopen the original private video link.';
+      } else {
+        title.textContent = 'Unable to join the consultation yet';
+        text.textContent = role === 'patient'
+          ? 'The patient link only becomes active shortly before the scheduled appointment. If it is already appointment time, refresh this page or ask the doctor for help.'
+          : 'The room did not connect. Check the appointment time, internet connection, and Daily configuration, then reopen your doctor link.';
+      }
+    });
+    frame.on('load-attempt-failed', function() {
+      fail('Could not connect to the video service', 'Check your internet connection and reopen the private consultation link. If the problem continues, contact the doctor.');
     });
     frame.on('error', function() {
-      fail('Unable to join the consultation', 'Check your internet connection, camera and microphone permissions, and appointment time. If you still cannot join, contact the doctor.');
+      if (!hasJoined) {
+        fail('Unable to join the consultation', 'Check the appointment time, internet connection, and camera/microphone permissions. If this is the doctor link, try redeploying the latest Apps Script version.');
+      }
     });
     await frame.join({ url: roomUrl.toString(), token: token });
   } catch (err) {
