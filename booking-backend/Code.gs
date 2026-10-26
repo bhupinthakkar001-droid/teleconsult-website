@@ -3,10 +3,8 @@
 const TIME_ZONE = 'Asia/Kolkata';
 const SLOTS_SHEET = 'Slots';
 const REQUESTS_SHEET = 'Requests';
-
-// Enter your WhatsApp number here in your PRIVATE Apps Script editor only.
-// Use country code + number, digits only. Do not put the real number in public GitHub code.
-const DOCTOR_WHATSAPP = '91XXXXXXXXXX';
+const DAILY_API_BASE = 'https://api.daily.co/v1';
+const VIDEO_PAGE_BASE = 'https://bhupinthakkar001-droid.github.io/teleconsult-website/video.html';
 
 const SLOT_HEADERS = [
   'slotId', 'date', 'time', 'status',
@@ -14,15 +12,56 @@ const SLOT_HEADERS = [
 ];
 const REQUEST_HEADERS = [
   'requestId', 'slotId', 'date', 'time',
-  'patientName', 'patientPhone', 'visitType', 'status', 'requestedAt', 'decisionAt', 'videoLink'
+  'patientName', 'patientPhone', 'visitType', 'status',
+  'requestedAt', 'decisionAt', 'patientVideoLink', 'doctorVideoLink'
 ];
 
 function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('Teleconsult bookings')
-    .addItem('Approve selected request', 'approveSelectedRequest')
+    .addItem('Approve request & create video room', 'approveSelectedRequest')
     .addItem('Decline selected request', 'declineSelectedRequest')
+    .addSeparator()
+    .addItem('Configure WhatsApp + Daily', 'configureTeleconsultation')
     .addToUi();
+}
+
+/**
+ * Run once after pasting this code. Enter secrets in the private prompt;
+ * they are stored in Script Properties, never in public source code.
+ */
+function configureTeleconsultation() {
+  const ui = SpreadsheetApp.getUi();
+  const phoneResponse = ui.prompt(
+    'Doctor WhatsApp number',
+    'Enter your number with country code, digits only (example: 919876543210). It is stored privately.',
+    ui.ButtonSet.OK_CANCEL
+  );
+  if (phoneResponse.getSelectedButton() !== ui.Button.OK) return;
+
+  const doctorPhone = String(phoneResponse.getResponseText() || '').replace(/\D/g, '');
+  if (!/^\d{10,15}$/.test(doctorPhone)) {
+    ui.alert('That number does not look valid. Run Configure WhatsApp + Daily again and enter digits with country code.');
+    return;
+  }
+
+  const keyResponse = ui.prompt(
+    'Daily API key',
+    'Paste your Daily API key from the Daily developer dashboard. It will be stored privately in Apps Script, not in GitHub.',
+    ui.ButtonSet.OK_CANCEL
+  );
+  if (keyResponse.getSelectedButton() !== ui.Button.OK) return;
+
+  const apiKey = String(keyResponse.getResponseText() || '').trim();
+  if (apiKey.length < 12) {
+    ui.alert('The API key looks too short. Run Configure WhatsApp + Daily again and paste the full key.');
+    return;
+  }
+
+  const props = PropertiesService.getScriptProperties();
+  props.setProperty('DOCTOR_WHATSAPP', doctorPhone);
+  props.setProperty('DAILY_API_KEY', apiKey);
+  ui.alert('Configuration saved privately. Your WhatsApp number and Daily API key were not added to the source code.');
 }
 
 function setupBookingSystem() {
@@ -35,8 +74,14 @@ function setupBookingSystem() {
   if (slots.getLastRow() === 0) slots.appendRow(SLOT_HEADERS);
   if (requests.getLastRow() === 0) {
     requests.appendRow(REQUEST_HEADERS);
-  } else if (!String(requests.getRange(1, 11).getDisplayValue()).trim()) {
-    requests.getRange(1, 11).setValue('videoLink');
+  } else {
+    if (!String(requests.getRange(1, 11).getDisplayValue()).trim() ||
+        String(requests.getRange(1, 11).getDisplayValue()).trim() === 'videoLink') {
+      requests.getRange(1, 11).setValue('patientVideoLink');
+    }
+    if (!String(requests.getRange(1, 12).getDisplayValue()).trim()) {
+      requests.getRange(1, 12).setValue('doctorVideoLink');
+    }
   }
 
   slots.setFrozenRows(1);
@@ -48,8 +93,8 @@ function setupBookingSystem() {
   requests.getRange('A:F').setNumberFormat('@');
 
   SpreadsheetApp.getUi().alert(
-    'Setup complete. Add one row per appointment to the Slots tab. ' +
-    'Use date YYYY-MM-DD, time like 10:00 AM, and status AVAILABLE. Keep this sheet private.'
+    'Setup complete. Your Slots and Requests data has been preserved. ' +
+    'Requests now supports separate patient and doctor video links in columns K and L.'
   );
 }
 
@@ -65,8 +110,7 @@ function doGet(e) {
     return ContentService.createTextOutput(callback + '(' + payload + ');')
       .setMimeType(ContentService.MimeType.JAVASCRIPT);
   }
-  return ContentService.createTextOutput(payload)
-    .setMimeType(ContentService.MimeType.JSON);
+  return jsonOutput({ ok: true, slots: getPublicSlots_() });
 }
 
 function doPost(e) {
@@ -83,6 +127,7 @@ function doPost(e) {
   const phoneDigits = phone.replace(/\D/g, '');
   const slotId = cleanText_(p.slotId, 80);
   const visitType = cleanText_(p.visitType, 40);
+  const doctorWhatsApp = PropertiesService.getScriptProperties().getProperty('DOCTOR_WHATSAPP') || '';
 
   if (name.length < 2) {
     return receiptPage_('Check your name', 'Please enter your full name and try again.', '');
@@ -96,7 +141,7 @@ function doPost(e) {
   if (!['First consultation', 'Follow-up consultation'].includes(visitType)) {
     return receiptPage_('Choose appointment type', 'Please choose first consultation or follow-up.', '');
   }
-  if (!/^\d{10,15}$/.test(DOCTOR_WHATSAPP)) {
+  if (!/^\d{10,15}$/.test(doctorWhatsApp)) {
     return receiptPage_('Booking setup incomplete', 'The doctor is still setting up WhatsApp confirmation. Please try again later.', '');
   }
 
@@ -136,7 +181,6 @@ function doPost(e) {
     const requestId = Utilities.getUuid().slice(0, 8).toUpperCase();
     const now = Utilities.formatDate(new Date(), TIME_ZONE, 'yyyy-MM-dd HH:mm:ss');
 
-    // Lock the slot first so it disappears from the public calendar immediately.
     sheet.getRange(rowIndex, 4, 1, 5).setValues([[
       'PENDING', safeCell_(name), safeCell_(phone), now, requestId
     ]]);
@@ -144,7 +188,7 @@ function doPost(e) {
 
     requests.appendRow([
       requestId, slotId, String(chosen[1]), String(chosen[2]),
-      safeCell_(name), safeCell_(phone), visitType, 'PENDING', now, ''
+      safeCell_(name), safeCell_(phone), visitType, 'PENDING', now, '', '', ''
     ]);
 
     const msg = [
@@ -159,7 +203,7 @@ function doPost(e) {
       'Please confirm or decline this request. I understand it is not confirmed until you approve it.'
     ].join('\n');
 
-    const waUrl = 'https://wa.me/' + DOCTOR_WHATSAPP + '?text=' + encodeURIComponent(msg);
+    const waUrl = 'https://wa.me/' + doctorWhatsApp + '?text=' + encodeURIComponent(msg);
     return receiptPage_(
       'Request received',
       'Your request has been saved and this slot is now held as PENDING, so other patients will no longer see it. Tap below and press Send in WhatsApp. Your appointment is confirmed only after the doctor approves it.',
@@ -210,26 +254,104 @@ function getPublicSlots_() {
 
 function approveSelectedRequest() {
   const ui = SpreadsheetApp.getUi();
-  const response = ui.prompt(
-    'Confirm appointment',
-    'Paste the Google Meet link for this appointment. The patient will receive it through WhatsApp.',
-    ui.ButtonSet.OK_CANCEL
-  );
-  if (response.getSelectedButton() !== ui.Button.OK) return;
-
-  const videoLink = String(response.getResponseText() || '').trim();
-  if (!/^https:\/\/meet\.google\.com\/[A-Za-z0-9-]+(?:\?.*)?$/.test(videoLink)) {
-    ui.alert('Please enter a valid Google Meet link beginning with https://meet.google.com/. No changes were made.');
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const reqSheet = ss.getSheetByName(REQUESTS_SHEET);
+  if (!reqSheet || ss.getActiveSheet().getName() !== REQUESTS_SHEET) {
+    ui.alert('Open the Requests tab and select a PENDING request row first.');
     return;
   }
-  setSelectedRequestStatus_('CONFIRMED', videoLink);
+  const row = ss.getActiveRange().getRow();
+  if (row < 2) {
+    ui.alert('Select a request row, not the header.');
+    return;
+  }
+
+  const req = reqSheet.getRange(row, 1, 1, Math.max(REQUEST_HEADERS.length, reqSheet.getLastColumn())).getDisplayValues()[0];
+  if (String(req[7]).toUpperCase() !== 'PENDING') {
+    ui.alert('This request is not pending.');
+    return;
+  }
+
+  let video;
+  try {
+    video = createDailySession_(req);
+  } catch (err) {
+    ui.alert('Could not create the video room', String(err.message || err) + '\n\nNo appointment status was changed. Check your Daily API key and try again.');
+    return;
+  }
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const latest = reqSheet.getRange(row, 1, 1, REQUEST_HEADERS.length).getDisplayValues()[0];
+    if (String(latest[7]).toUpperCase() !== 'PENDING') {
+      ui.alert('This request is no longer pending. A temporary Daily room may have been created; it will expire automatically.');
+      return;
+    }
+
+    const requestId = String(latest[0] || '');
+    const slotId = String(latest[1] || '');
+    const slots = ss.getSheetByName(SLOTS_SHEET);
+    const slotRows = slots.getDataRange().getDisplayValues();
+    let matchRow = -1;
+    for (let i = 1; i < slotRows.length; i++) {
+      if (String(slotRows[i][0]) === slotId &&
+          String(slotRows[i][7]) === requestId) {
+        matchRow = i + 1;
+        break;
+      }
+    }
+    if (matchRow < 0) {
+      ui.alert('Could not find the matching held slot. No appointment status was changed.');
+      return;
+    }
+
+    const now = Utilities.formatDate(new Date(), TIME_ZONE, 'yyyy-MM-dd HH:mm:ss');
+    slots.getRange(matchRow, 4).setValue('CONFIRMED');
+    reqSheet.getRange(row, 8).setValue('CONFIRMED');
+    reqSheet.getRange(row, 10).setValue(now);
+    reqSheet.getRange(row, 11).setValue(video.patientLink);
+    reqSheet.getRange(row, 12).setValue(video.doctorLink);
+
+    const patientName = String(latest[4] || 'there');
+    const patientPhone = normalizeWhatsAppPhone_(latest[5]);
+    const date = String(latest[2] || '');
+    const time = String(latest[3] || '');
+    const visitType = String(latest[6] || 'Video consultation');
+    const message = [
+      'Hello ' + patientName + ', your video consultation with Dr. Bhupin is confirmed.',
+      'Date: ' + date,
+      'Time: ' + time,
+      'Appointment: ' + visitType,
+      'Join your consultation using this secure link: ' + video.patientLink,
+      '',
+      'Open the link at your appointment time. Allow camera and microphone access when prompted.',
+      'If you need to reschedule, please contact the doctor.'
+    ].join('\n');
+    const waUrl = 'https://wa.me/' + patientPhone + '?text=' + encodeURIComponent(message);
+
+    const dialogHtml = '<!doctype html><html><head><base target="_blank"><style>' +
+      'body{font:14px/1.5 Arial,sans-serif;padding:18px;color:#19362d}' +
+      'h2{font-size:20px;margin:0 0 8px}p{color:#596b62;margin:0 0 14px}' +
+      'a{display:block;text-align:center;background:#21634c;color:#fff;padding:12px 14px;border-radius:10px;text-decoration:none;font-weight:bold;margin-bottom:10px}' +
+      '.secondary{background:#e5eee7;color:#19362d}.note{font-size:12px;margin-top:12px;color:#68776f}' +
+      '</style></head><body><h2>Video consultation ready</h2>' +
+      '<p>The appointment is confirmed. The room link has been saved in Requests columns K and L.</p>' +
+      '<a href="' + escapeHtml_(video.doctorLink) + '">Join as doctor →</a>' +
+      '<a class="secondary" href="' + escapeHtml_(waUrl) + '">Open WhatsApp to send patient link →</a>' +
+      '<p class="note">WhatsApp opens with a prefilled message. Review it and press Send; it is not sent automatically. Do not forward the doctor link.</p>' +
+      '</body></html>';
+    ui.showModalDialog(HtmlService.createHtmlOutput(dialogHtml).setWidth(440).setHeight(350), 'Video consultation ready');
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 function declineSelectedRequest() {
-  setSelectedRequestStatus_('DECLINED', '');
+  setSelectedRequestStatus_('DECLINED');
 }
 
-function setSelectedRequestStatus_(newStatus, videoLink) {
+function setSelectedRequestStatus_(newStatus) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const reqSheet = ss.getSheetByName(REQUESTS_SHEET);
   const active = ss.getActiveSheet();
@@ -244,7 +366,7 @@ function setSelectedRequestStatus_(newStatus, videoLink) {
     return;
   }
 
-  const req = reqSheet.getRange(row, 1, 1, REQUEST_HEADERS.length).getDisplayValues()[0];
+  const req = reqSheet.getRange(row, 1, 1, Math.max(REQUEST_HEADERS.length, reqSheet.getLastColumn())).getDisplayValues()[0];
   if (String(req[7]).toUpperCase() !== 'PENDING') {
     ui.alert('This request is not pending.');
     return;
@@ -266,51 +388,111 @@ function setSelectedRequestStatus_(newStatus, videoLink) {
 
     const now = Utilities.formatDate(new Date(), TIME_ZONE, 'yyyy-MM-dd HH:mm:ss');
     if (matchRow > 0) {
-      if (newStatus === 'CONFIRMED') {
-        slots.getRange(matchRow, 4).setValue('CONFIRMED');
-      } else {
-        slots.getRange(matchRow, 4, 1, 5).clearContent();
-        slots.getRange(matchRow, 4).setValue('AVAILABLE');
-      }
+      slots.getRange(matchRow, 4, 1, 5).clearContent();
+      slots.getRange(matchRow, 4).setValue('AVAILABLE');
     }
     reqSheet.getRange(row, 8).setValue(newStatus);
     reqSheet.getRange(row, 10).setValue(now);
-
-    if (newStatus === 'CONFIRMED') {
-      reqSheet.getRange(row, 11).setValue(videoLink);
-      const patientName = String(req[4] || 'there');
-      const patientPhone = normalizeWhatsAppPhone_(req[5]);
-      const date = String(req[2] || '');
-      const time = String(req[3] || '');
-      const visitType = String(req[6] || 'Video consultation');
-      const message = [
-        'Hello ' + patientName + ', your video consultation with Dr. Bhupin is confirmed.',
-        'Date: ' + date,
-        'Time: ' + time,
-        'Appointment: ' + visitType,
-        'Join your consultation using this Google Meet link: ' + videoLink,
-        '',
-        'Please join a few minutes before the appointment. If you need to reschedule, please contact the doctor.'
-      ].join('\n');
-      const waUrl = 'https://wa.me/' + patientPhone + '?text=' + encodeURIComponent(message);
-
-      const dialogHtml = '<!doctype html><html><head><base target="_blank"><style>' +
-        'body{font:14px/1.5 Arial,sans-serif;padding:18px;color:#19362d}' +
-        'h2{font-size:20px;margin:0 0 8px}p{color:#596b62;margin:0 0 16px}' +
-        'a{display:block;text-align:center;background:#21634c;color:#fff;padding:12px 14px;border-radius:10px;text-decoration:none;font-weight:bold}' +
-        '.note{font-size:12px;margin-top:14px;color:#68776f}' +
-        '</style></head><body><h2>Appointment confirmed</h2>' +
-        '<p>Request ' + escapeHtml_(String(req[0])) + ' is marked CONFIRMED. A Google Meet link has been saved in the Requests tab.</p>' +
-        '<a href="' + escapeHtml_(waUrl) + '">Open WhatsApp to send confirmation →</a>' +
-        '<p class="note">WhatsApp opens with a prefilled message. Review it and press Send; the message is not sent automatically.</p>' +
-        '</body></html>';
-      ui.showModalDialog(HtmlService.createHtmlOutput(dialogHtml).setWidth(420).setHeight(270), 'Send patient confirmation');
-    } else {
+    if (newStatus === 'DECLINED') {
       ui.alert('Request declined and its slot is available again. Please notify the patient on WhatsApp.');
     }
   } finally {
     lock.releaseLock();
   }
+}
+
+function createDailySession_(req) {
+  const props = PropertiesService.getScriptProperties();
+  const apiKey = props.getProperty('DAILY_API_KEY') || '';
+  if (apiKey.length < 12) {
+    throw new Error('Daily API key is not configured. Choose Teleconsult bookings → Configure WhatsApp + Daily and enter it once.');
+  }
+
+  const requestId = String(req[0] || Utilities.getUuid().slice(0, 8)).toLowerCase().replace(/[^a-z0-9-]/g, '');
+  const patientName = cleanText_(req[4] || 'Patient', 80);
+  const date = String(req[2] || '').trim();
+  const time = String(req[3] || '').trim();
+  const startDate = Utilities.parseDate(date + ' ' + time, TIME_ZONE, 'yyyy-MM-dd hh:mm a');
+  const startEpoch = Math.floor(startDate.getTime() / 1000);
+  const nowEpoch = Math.floor(Date.now() / 1000);
+  if (!startEpoch || startEpoch < nowEpoch - 3600) {
+    throw new Error('The selected appointment time appears to be in the past. Check the date/time in Requests before approving.');
+  }
+
+  const roomName = 'consult-' + requestId;
+  const nbf = Math.max(nowEpoch - 60, startEpoch - 15 * 60);
+  const exp = Math.max(startEpoch + 2 * 60 * 60, nowEpoch + 30 * 60);
+
+  const roomResponse = dailyApiRequest_('/rooms', {
+    name: roomName,
+    privacy: 'private',
+    properties: {
+      nbf: nbf,
+      exp: exp,
+      max_participants: 2,
+      enable_prejoin_ui: true,
+      enable_knocking: false,
+      eject_at_room_exp: true,
+      start_video_off: false,
+      start_audio_off: false
+    }
+  }, apiKey);
+
+  if (!roomResponse.url) {
+    throw new Error('Daily did not return a room URL. Check your Daily account and API key.');
+  }
+  const roomUrl = String(roomResponse.url);
+  const patientToken = createDailyToken_(apiKey, roomName, patientName, false, nbf, exp);
+  const doctorToken = createDailyToken_(apiKey, roomName, 'Dr. Bhupin Thakkar', true, nbf, exp);
+
+  return {
+    patientLink: buildVideoPageLink_(roomUrl, patientToken, 'patient'),
+    doctorLink: buildVideoPageLink_(roomUrl, doctorToken, 'doctor')
+  };
+}
+
+function createDailyToken_(apiKey, roomName, userName, isOwner, nbf, exp) {
+  const result = dailyApiRequest_('/meeting-tokens', {
+    properties: {
+      room_name: roomName,
+      is_owner: isOwner,
+      user_name: userName,
+      nbf: nbf,
+      exp: exp,
+      eject_at_token_exp: true,
+      enable_prejoin_ui: true
+    }
+  }, apiKey);
+  if (!result.token) throw new Error('Daily did not return a meeting token.');
+  return String(result.token);
+}
+
+function dailyApiRequest_(path, payload, apiKey) {
+  const response = UrlFetchApp.fetch(DAILY_API_BASE + path, {
+    method: 'post',
+    contentType: 'application/json',
+    headers: { Authorization: 'Bearer ' + apiKey },
+    payload: JSON.stringify(payload),
+    muteHttpExceptions: true
+  });
+  const status = response.getResponseCode();
+  const body = response.getContentText();
+  let data = {};
+  try { data = JSON.parse(body); } catch (ignored) {}
+  if (status < 200 || status >= 300) {
+    const errorText = String(data.info || data.error || data.message || 'Daily API request failed');
+    throw new Error('Daily API returned ' + status + ': ' + errorText.slice(0, 220));
+  }
+  return data;
+}
+
+function buildVideoPageLink_(roomUrl, token, role) {
+  const safeRoomUrl = String(roomUrl || '');
+  if (!/^https:\/\/[a-z0-9-]+\.daily\.co\/[A-Za-z0-9_-]+(?:\?.*)?$/i.test(safeRoomUrl)) {
+    throw new Error('Daily returned a room URL in an unexpected format.');
+  }
+  return VIDEO_PAGE_BASE + '?room=' + encodeURIComponent(safeRoomUrl) +
+    '&token=' + encodeURIComponent(token) + '&role=' + encodeURIComponent(role);
 }
 
 function normalizeWhatsAppPhone_(value) {
