@@ -80,11 +80,19 @@ function doPost(e) {
 
   const name = cleanText_(p.patientName, 80);
   const phone = cleanPhone_(p.phone);
-  const slotId = cleanText_(p.slotId, 80);
-  const visitType = cleanText_(p.visitType, 40);
-
-  if (name.length < 2 || !/^\+?[0-9 ]{7,18}$/.test(phone) || !slotId || !['First consultation', 'Follow-up consultation'].includes(visitType)) {
-    return receiptPage_('Check your details', 'Please return to the website and enter a valid name and mobile number.', '');
+  const slotId = cleanText_(p.slotId || p.time, 80);
+  const visitType = cleanText_(p.visitTy  if (name.length < 2) {
+    return receiptPage_('Check your name', 'Please return to the website and enter your full name.', '');
+  }
+  if (!/^\\+?[0-9 ]{7,18}$/.test(phone)) {
+    return receiptPage_('Check your mobile number', 'Enter a valid mobile number using digits. You can include +91 if needed.', '');
+  }
+  if (!slotId) {
+    return receiptPage_('Choose an appointment time', 'Please return to the website, select an available time, and try again.', '');
+  }
+  if (!['First consultation', 'Follow-up consultation'].includes(visitType)) {
+    return receiptPage_('Choose appointment type', 'Please return to the website and select first consultation or follow-up.', '');
+  }, '');
   }
   if (!DOCTOR_WHATSAPP || DOCTOR_WHATSAPP.indexOf('X') !== -1) {
     return receiptPage_('Booking setup incomplete', 'The booking service has not yet been fully configured. Please try again later.', '');
