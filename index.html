@@ -3,40 +3,125 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#f5f7f4">
-<meta name="description" content="Online medical consultation and follow-up information from Dr. Your Name.">
-<title>Dr. Your Name | Online Consultation</title>
+<meta name="theme-color" content="#f4f7f4">
+<meta name="description" content="Book an online medical consultation with Dr. Your Name.">
+<title>Dr. Your Name | Book an Appointment</title>
 <style>
-:root{--ink:#19362d;--muted:#65756d;--green:#21634c;--pale:#e4efe7;--line:#e0e8e2;--bg:#f6f8f5;--white:#fff}
-*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;line-height:1.55}a{color:inherit;text-decoration:none}.wrap{width:min(1100px,92%);margin:auto}
-header{display:flex;align-items:center;justify-content:space-between;padding:22px 0;gap:20px}.brand{display:flex;align-items:center;gap:12px;font-weight:800;letter-spacing:-.03em}.logo{display:grid;place-items:center;width:44px;height:44px;border-radius:15px;background:var(--pale);color:var(--green);font-size:24px}.brand small{display:block;font-size:11px;color:var(--muted);font-weight:550;letter-spacing:0}nav{display:flex;align-items:center;gap:24px;color:var(--muted);font-size:14px}.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:0;background:var(--green);color:white;padding:13px 18px;border-radius:13px;font-weight:750;font-size:14px;cursor:pointer;transition:.18s}.btn:hover{background:#164a37;transform:translateY(-1px)}.btn.alt{background:white;color:var(--green);border:1px solid var(--line)}
-.hero{display:grid;grid-template-columns:1.08fr .92fr;gap:48px;align-items:center;padding:52px 0 66px}.eyebrow{display:inline-flex;align-items:center;gap:8px;background:var(--pale);color:var(--green);padding:7px 12px;border-radius:999px;font-size:12px;text-transform:uppercase;font-weight:800;letter-spacing:.05em}.eyebrow i{width:7px;height:7px;background:#40966c;border-radius:50%}h1{font-size:clamp(40px,5.5vw,68px);line-height:1.02;letter-spacing:-.06em;margin:20px 0}.lead{font-size:18px;color:var(--muted);max-width:570px}.actions{display:flex;gap:12px;flex-wrap:wrap;margin:28px 0 20px}.trust{display:flex;flex-wrap:wrap;gap:18px;color:var(--muted);font-size:13px}.trust span:before{content:"✓";color:var(--green);font-weight:900;margin-right:7px}
-.visual{position:relative;overflow:hidden;min-height:385px;border-radius:32px;background:#e3eee6;display:grid;place-items:center;padding:25px}.visual:before,.visual:after{content:"";position:absolute;background:#d0e2d5;border-radius:50%}.visual:before{width:280px;height:280px;right:-70px;top:-95px}.visual:after{width:190px;height:190px;left:-70px;bottom:-80px}.profile{z-index:1;background:white;border-radius:25px;padding:25px;width:min(355px,100%);box-shadow:0 24px 60px #264b3718}.avatar{width:72px;height:72px;display:grid;place-items:center;background:var(--pale);color:var(--green);border-radius:23px;font-size:30px;margin-bottom:15px}.profile h2{font-size:23px;letter-spacing:-.04em;margin:0}.muted{color:var(--muted)}.credential{font-size:13px;margin:5px 0 17px}.detail{display:flex;gap:11px;align-items:center;border-top:1px solid var(--line);padding:12px 0;font-size:14px}.small-icon{display:grid;place-items:center;width:34px;height:34px;border-radius:11px;background:#f1f6f2}
-section.content{padding:42px 0}.section-head{text-align:center;max-width:650px;margin:0 auto 28px}.section-head h2{font-size:clamp(29px,3.5vw,40px);letter-spacing:-.045em;line-height:1.1;margin:0 0 12px}.section-head p{margin:0;color:var(--muted)}.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}.card{background:white;border:1px solid var(--line);border-radius:21px;padding:24px}.card .symbol{width:46px;height:46px;display:grid;place-items:center;border-radius:15px;background:var(--pale);color:var(--green);font-size:22px}.card h3{margin:16px 0 8px;font-size:18px}.card p{margin:0;color:var(--muted);font-size:14px}
-.booking{display:grid;grid-template-columns:.9fr 1.1fr;gap:30px;align-items:start;background:#eaf1eb;border-radius:30px;padding:clamp(22px,4vw,44px)}.booking h2{font-size:clamp(30px,3.4vw,40px);line-height:1.08;letter-spacing:-.045em;margin:14px 0}.booking p{color:var(--muted)}form{background:white;border:1px solid var(--line);border-radius:21px;padding:23px;display:grid;gap:14px}label{font-size:13px;font-weight:750;display:block;margin-bottom:6px}input,select{width:100%;border:1px solid #d5e0d8;border-radius:11px;padding:12px 13px;background:white;color:var(--ink);font:inherit}input:focus,select:focus{outline:3px solid #cfe4d5;border-color:var(--green)}.note{font-size:12px!important;color:#718078!important}.status{display:none;background:var(--pale);color:var(--green);padding:12px;border-radius:12px;font-size:14px}footer{padding:30px 0 40px;color:var(--muted);font-size:12px}.foot{border-top:1px solid var(--line);padding-top:20px;display:flex;justify-content:space-between;gap:15px;flex-wrap:wrap}.mobile-cta{display:none}
-@media(max-width:760px){nav a:not(.btn){display:none}.hero{grid-template-columns:1fr;gap:25px;padding-top:26px}.visual{min-height:330px}.cards{grid-template-columns:1fr}.booking{grid-template-columns:1fr}.section-head{text-align:left}.mobile-cta{display:block;position:sticky;bottom:10px;z-index:5;width:92%;margin:0 auto 10px}.mobile-cta .btn{width:100%;box-shadow:0 8px 24px #193e2c30}.lead{font-size:16px}header .btn{padding:10px 12px}}
+:root{--green:#21634c;--green-dark:#164b38;--ink:#1b342b;--muted:#6b7b73;--pale:#e6efe8;--line:#e0e8e2;--paper:#fff;--bg:#f4f7f4}
+*{box-sizing:border-box}html,body{margin:0;min-height:100%;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--ink)}
+body{background:var(--bg);min-height:100svh;display:flex;flex-direction:column}
+.topbar{height:74px;display:flex;align-items:center;width:min(1100px,92%);margin:0 auto}
+.brand{display:flex;align-items:center;gap:10px;font-weight:800;letter-spacing:-.03em;font-size:16px}.mark{display:grid;place-items:center;width:38px;height:38px;border-radius:13px;background:var(--pale);color:var(--green);font-size:21px}
+.stage{width:min(1030px,92%);margin:auto;flex:1;display:grid;place-items:center;padding:10px 0 34px}
+.panel{width:100%;background:var(--paper);border:1px solid var(--line);border-radius:30px;padding:clamp(22px,4vw,44px);display:grid;grid-template-columns:1fr 1fr;align-items:center;gap:clamp(25px,5vw,62px);box-shadow:0 22px 65px rgba(26,60,43,.06)}
+.doctor{display:flex;align-items:center;gap:23px;min-width:0}
+.photo{flex:0 0 clamp(130px,17vw,190px);width:clamp(130px,17vw,190px);aspect-ratio:4/5;overflow:hidden;border-radius:23px;background:#e5eee7;display:grid;place-items:center}
+.photo svg{width:100%;height:100%;display:block}
+.info h1{font-size:clamp(25px,3vw,36px);letter-spacing:-.05em;line-height:1.07;margin:0 0 9px}
+.qualification{font-size:14px;color:var(--green);font-weight:750;margin:0 0 7px}
+.location{font-size:13px;color:var(--muted);margin:0}
+.rule{height:1px;background:var(--line);margin:21px 0 17px}
+.meta{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:13px;margin-top:9px}.dot{width:7px;height:7px;border-radius:50%;background:#58a477}
+.action{border-left:1px solid var(--line);padding-left:clamp(24px,4vw,54px)}
+.kicker{text-transform:uppercase;letter-spacing:.12em;font-size:11px;font-weight:850;color:var(--green)}
+.action h2{font-size:clamp(28px,3.3vw,42px);line-height:1.08;letter-spacing:-.055em;margin:12px 0 11px;max-width:350px}
+.action p{color:var(--muted);font-size:15px;margin:0 0 25px;max-width:340px}
+.book{width:100%;min-height:68px;border:0;border-radius:17px;background:var(--green);color:white;font-size:18px;font-weight:800;letter-spacing:-.02em;display:flex;align-items:center;justify-content:center;gap:15px;cursor:pointer;box-shadow:0 10px 24px rgba(33,99,76,.16);transition:transform .15s,background .15s}
+.book:hover{background:var(--green-dark);transform:translateY(-2px)}.arrow{font-size:22px;font-weight:500}
+.under{margin-top:13px;text-align:center;font-size:12px;color:var(--muted)}
+.footer{padding:0 4% 18px;text-align:center;font-size:11px;color:#8a9790}
+.modal-wrap{position:fixed;inset:0;display:none;place-items:center;padding:16px;background:rgba(13,32,24,.48);backdrop-filter:blur(5px);z-index:10}
+.modal-wrap.open{display:grid}
+.modal{width:min(490px,100%);max-height:calc(100svh - 32px);overflow-y:auto;background:white;border-radius:24px;padding:25px;box-shadow:0 25px 100px #0b211a40;animation:pop .16s ease-out}
+@keyframes pop{from{opacity:0;transform:translateY(7px) scale(.99)}to{opacity:1;transform:translateY(0) scale(1)}}
+.modal-head{display:flex;align-items:flex-start;justify-content:space-between;gap:15px;margin-bottom:18px}.modal-head h2{font-size:27px;letter-spacing:-.045em;line-height:1.1;margin:0 0 6px}.modal-head p{font-size:13px;color:var(--muted);margin:0}
+.close{width:36px;height:36px;flex:0 0 36px;border:0;border-radius:11px;background:#f1f5f1;color:var(--ink);font-size:22px;cursor:pointer}
+form{display:grid;gap:13px}.fields{display:grid;grid-template-columns:1fr 1fr;gap:12px}label{display:block;font-size:12px;font-weight:750;margin-bottom:6px}input,select{font:inherit;font-size:14px;width:100%;min-width:0;border:1px solid #d7e1d9;border-radius:11px;padding:12px;background:#fff;color:var(--ink)}input:focus,select:focus{outline:3px solid #d4e8d9;border-color:var(--green)}.submit{min-height:52px;border:0;border-radius:13px;background:var(--green);color:#fff;font:inherit;font-weight:800;font-size:15px;cursor:pointer;margin-top:3px}.submit:hover{background:var(--green-dark)}.fine{font-size:11px;line-height:1.45;color:var(--muted);margin:0}.notice{display:none;border-radius:12px;padding:12px;background:var(--pale);color:var(--green);font-size:13px;line-height:1.45}.notice.show{display:block}
+@media(max-width:760px){.topbar{height:58px}.stage{width:min(520px,92%);padding:6px 0 17px}.panel{grid-template-columns:1fr;gap:21px;padding:21px;border-radius:24px}.doctor{gap:17px}.photo{flex-basis:112px;width:112px;border-radius:18px}.info h1{font-size:clamp(23px,6vw,31px)}.qualification{font-size:13px}.rule{margin:12px 0 10px}.meta{font-size:12px;margin-top:7px}.action{border-left:0;border-top:1px solid var(--line);padding:20px 0 0}.action h2{font-size:28px;max-width:none;margin:7px 0}.action p{font-size:13px;margin-bottom:16px;max-width:none}.book{min-height:60px;font-size:17px}.under{margin-top:9px}.footer{padding-bottom:12px}}
+@media(max-width:370px){.panel{padding:16px}.doctor{gap:12px}.photo{flex-basis:95px;width:95px}.info h1{font-size:22px}.qualification{font-size:12px}.location{font-size:12px}.fields{grid-template-columns:1fr}.modal{padding:19px}}
+@media(min-width:761px) and (max-height:690px){.topbar{height:54px}.stage{padding-bottom:12px}.panel{padding:22px;gap:28px}.photo{width:142px;flex-basis:142px}.footer{padding-bottom:8px}}
 </style>
 </head>
 <body>
-<div class="wrap">
-<header>
-<a class="brand" href="#"><span class="logo">✚</span><span>Dr. Your Name<small>Internal Medicine · Online consultations</small></span></a>
-<nav><a href="#how">How it works</a><a href="#about">About</a><a class="btn" href="#booking">Request appointment ↗</a></nav>
-</header>
-<main>
-<section class="hero">
-<div><span class="eyebrow"><i></i> Online consultations</span><h1>Thoughtful medical care, from home.</h1><p class="lead">A simple way to discuss your health concerns, understand your next steps and arrange follow-up care without the extra travel.</p><div class="actions"><a class="btn" href="#booking">Request a consultation →</a><a class="btn alt" href="#how">How it works</a></div><div class="trust"><span>Convenient video visits</span><span>Clear next steps</span></div></div>
-<div class="visual" aria-label="Doctor profile illustration"><div class="profile"><div class="avatar">✚</div><h2>Dr. Your Name</h2><div class="credential muted">DNB Medicine · Add verified registration details</div><div class="detail"><span class="small-icon">▦</span>Choose a convenient time</div><div class="detail"><span class="small-icon">◉</span>Connect by video</div><div class="detail"><span class="small-icon">✓</span>Receive your care plan</div></div></div>
+<header class="topbar"><div class="brand"><span class="mark">✚</span><span>Online consultation</span></div></header>
+<main class="stage">
+<section class="panel" aria-label="Doctor and appointment booking">
+  <div class="doctor">
+    <div class="photo" aria-label="Doctor photo placeholder">
+      <!-- Replace this illustration with your actual professional photo before launch. -->
+      <svg viewBox="0 0 200 250" role="img" aria-label="Illustrated doctor portrait placeholder" xmlns="http://www.w3.org/2000/svg">
+        <rect width="200" height="250" fill="#e5eee7"/>
+        <circle cx="166" cy="34" r="28" fill="#d2e3d7"/>
+        <circle cx="36" cy="218" r="40" fill="#d2e3d7"/>
+        <path d="M31 250c5-47 33-72 69-72s65 25 69 72" fill="#fff"/>
+        <path d="M68 182l32 32 32-32 17 68H51z" fill="#f7faf8"/>
+        <path d="M78 181h44l-22 37z" fill="#c6ddd0"/>
+        <rect x="91" y="148" width="18" height="32" rx="8" fill="#b97d60"/>
+        <ellipse cx="100" cy="106" rx="42" ry="51" fill="#c88e70"/>
+        <path d="M58 104c-5-39 11-66 44-67 37-1 48 25 42 63l-8-17-12-19c-17 13-38 17-61 14l-5 26z" fill="#283c34"/>
+        <path d="M64 100c-3 34 13 56 36 58 25-2 39-24 36-58l-7-18c-16 11-38 14-59 11z" fill="#c88e70"/>
+        <path d="M71 100q9-7 18 0M111 100q9-7 18 0" fill="none" stroke="#49352e" stroke-width="3" stroke-linecap="round"/>
+        <path d="M94 122q7 5 14 0" fill="none" stroke="#8e5545" stroke-width="2.5" stroke-linecap="round"/>
+        <path d="M86 139q14 10 28 0" fill="none" stroke="#fff0e8" stroke-width="3" stroke-linecap="round"/>
+        <path d="M57 96q-8-4-8 8 1 14 12 13M143 96q8-4 8 8-1 14-12 13" fill="#c88e70"/>
+        <path d="M74 181l26 25-19 25-28-38zM126 181l-26 25 19 25 28-38z" fill="#fff"/>
+        <path d="M100 205v45" stroke="#d6e4dc" stroke-width="2"/>
+        <circle cx="100" cy="221" r="9" fill="none" stroke="#21634c" stroke-width="3"/>
+        <path d="M100 230v13q0 7 7 7h8" fill="none" stroke="#21634c" stroke-width="3" stroke-linecap="round"/>
+      </svg>
+    </div>
+    <div class="info">
+      <h1>Dr. Your Name</h1>
+      <p class="qualification">DNB · General Medicine</p>
+      <p class="location">Internal Medicine</p>
+      <div class="rule"></div>
+      <div class="meta"><span class="dot"></span> Video consultation</div>
+      <div class="meta">✓ &nbsp;Personalised medical advice</div>
+    </div>
+  </div>
+  <div class="action">
+    <div class="kicker">Simple. Convenient. Online.</div>
+    <h2>Book your appointment</h2>
+    <p>Choose a date and time that works for you.</p>
+    <button class="book" id="openBooking" type="button">Book Appointment <span class="arrow">→</span></button>
+    <div class="under">A few details · Takes less than a minute</div>
+  </div>
 </section>
-<section id="how" class="content"><div class="section-head"><h2>Care in three simple steps</h2><p>A straightforward experience designed around your convenience.</p></div><div class="cards"><article class="card"><div class="symbol">▦</div><h3>1. Request a time</h3><p>Share your contact details and preferred time. Your appointment is confirmed separately after availability is checked.</p></article><article class="card"><div class="symbol">◉</div><h3>2. Meet by video</h3><p>After confirmation, receive instructions for joining your scheduled video consultation.</p></article><article class="card"><div class="symbol">✓</div><h3>3. Know your next steps</h3><p>When clinically appropriate, receive a prescription, advice and a follow-up plan.</p></article></div></section>
-<section id="about" class="content"><div class="section-head"><h2>Meet your doctor</h2><p>We'll personalize this section with your verified details before launch.</p></div><div class="card" style="max-width:780px;margin:auto;display:flex;gap:18px;align-items:flex-start"><div class="avatar" style="width:60px;height:60px;flex:0 0 60px;margin:0">✚</div><div><h3 style="margin:0 0 6px">Dr. Your Name, DNB (General Medicine)</h3><p class="muted" style="margin:0">Add your professional profile, current registration details, consultation languages and areas of practice here. Only display accurate, verifiable credentials.</p></div></div></section>
-<section id="booking" class="content"><div class="booking"><div><span class="eyebrow">Appointment request</span><h2>Let's find a time that works for you.</h2><p>Send a request and wait for confirmation before considering an appointment booked.</p><p class="note">Prototype only: this form does not send or save information. Do not enter real patient information until a secure booking service is connected.</p></div><form id="bookingForm"><div><label for="name">Your name</label><input id="name" name="name" autocomplete="name" required placeholder="Enter your name"></div><div><label for="phone">Mobile number</label><input id="phone" name="phone" autocomplete="tel" type="tel" required placeholder="Enter your mobile number"></div><div><label for="slot">Preferred time</label><select id="slot" name="slot" required><option value="">Choose a preference</option><option>Morning</option><option>Afternoon</option><option>Evening</option><option>Flexible</option></select></div><div><label for="kind">Appointment type</label><select id="kind" name="kind" required><option value="">Choose one</option><option>First consultation</option><option>Follow-up</option></select></div><button class="btn" type="submit">Preview request →</button><div id="status" class="status" role="status"></div><p class="note">Do not use this website for emergencies. For urgent or life-threatening symptoms, seek local emergency care immediately.</p></form></div></section>
 </main>
-<footer><div class="foot"><span>© <span id="year"></span> Dr. Your Name · Online consultations</span><span>Privacy · Terms · Cancellation policy — to be added before launch</span></div></footer>
-</div><div class="mobile-cta"><a class="btn" href="#booking">Request a consultation →</a></div>
+<footer class="footer">For emergencies, please seek urgent local medical care.</footer>
+<div class="modal-wrap" id="modalWrap" role="presentation">
+  <section class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal-head"><div><h2 id="modalTitle">Book an appointment</h2><p>Tell us when you'd prefer to consult.</p></div><button class="close" id="closeBooking" type="button" aria-label="Close">×</button></div>
+    <form id="bookingForm">
+      <div><label for="patientName">Your name</label><input id="patientName" name="patientName" required autocomplete="name" placeholder="Full name"></div>
+      <div><label for="phone">Mobile number</label><input id="phone" name="phone" type="tel" required autocomplete="tel" inputmode="tel" placeholder="Phone number"></div>
+      <div class="fields">
+        <div><label for="date">Preferred date</label><input id="date" name="date" type="date" required></div>
+        <div><label for="time">Preferred time</label><select id="time" name="time" required><option value="">Select time</option><option>9:00–11:00 AM</option><option>11:00 AM–1:00 PM</option><option>2:00–4:00 PM</option><option>4:00–6:00 PM</option><option>6:00–8:00 PM</option><option>Flexible</option></select></div>
+      </div>
+      <div><label for="visitType">Appointment type</label><select id="visitType" name="visitType" required><option value="">Choose one</option><option>First consultation</option><option>Follow-up consultation</option></select></div>
+      <button class="submit" type="submit">Request Appointment</button>
+      <p class="fine">Your requested slot is not confirmed until you receive confirmation. This website prototype is not yet connected to appointment processing.</p>
+      <div class="notice" id="notice" role="status"></div>
+    </form>
+  </section>
+</div>
 <script>
-document.getElementById('year').textContent = new Date().getFullYear();
-document.getElementById('bookingForm').addEventListener('submit',function(e){e.preventDefault();const s=document.getElementById('status');s.style.display='block';s.textContent='Demo only: no request was sent or booked. A secure booking service still needs to be connected.';});
+const modal=document.getElementById('modalWrap');
+const openBtn=document.getElementById('openBooking');
+const closeBtn=document.getElementById('closeBooking');
+const form=document.getElementById('bookingForm');
+const notice=document.getElementById('notice');
+const dateInput=document.getElementById('date');
+function todayLocal(){const d=new Date();const offset=d.getTimezoneOffset();return new Date(d.getTime()-offset*60000).toISOString().slice(0,10)}
+dateInput.min=todayLocal();
+function openModal(){modal.classList.add('open');document.body.style.overflow='hidden';setTimeout(()=>document.getElementById('patientName').focus(),30)}
+function closeModal(){modal.classList.remove('open');document.body.style.overflow='';notice.classList.remove('show')}
+openBtn.addEventListener('click',openModal);
+closeBtn.addEventListener('click',closeModal);
+modal.addEventListener('click',e=>{if(e.target===modal)closeModal()});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal()});
+form.addEventListener('submit',e=>{e.preventDefault();notice.textContent='This preview is not connected to appointment processing yet, so your request has not been sent or booked.';notice.classList.add('show')});
 </script>
 </body>
 </html>
