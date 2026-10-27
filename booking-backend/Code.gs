@@ -251,7 +251,8 @@ function approveSelectedRequest() {
     reqSheet.getRange(row, 11).setValue(meetLink);
 
     const patientName = String(latest[4] || 'there');
-    const patientPhone = normalizeWhatsAppPhone_(latest[5]);
+    const patientPhoneRaw = String(latest[5] || '');
+    const patientPhone = normalizeWhatsAppPhone_(patientPhoneRaw);
     const message = [
       'Hello ' + patientName + ', your video consultation with Dr. Bhupin is confirmed.',
       'Date: ' + String(latest[2] || ''),
@@ -261,19 +262,29 @@ function approveSelectedRequest() {
       '',
       'Open the link at the appointment time. Allow camera and microphone access when prompted.',
       'If you need to reschedule, please contact the doctor.'
-    ].join('\n');
+    ].join('\\n');
     const waUrl = 'https://wa.me/' + patientPhone + '?text=' + encodeURIComponent(message);
+    const smsUrl = 'sms:+' + patientPhone + '?body=' + encodeURIComponent(message);
+    const safeMessage = escapeHtml_(message);
+    const safePhone = escapeHtml_(patientPhoneRaw);
 
-    const dialogHtml = '<!doctype html><html><head><base target="_blank"><style>' +
+    const dialogHtml = '<!doctype html><html><head><base target="_blank"><meta name="viewport" content="width=device-width,initial-scale=1"><style>' +
       'body{font:14px/1.5 Arial,sans-serif;padding:18px;color:#19362d}' +
       'h2{font-size:20px;margin:0 0 8px}p{color:#596b62;margin:0 0 14px}' +
-      'a{display:block;text-align:center;background:#21634c;color:#fff;padding:12px 14px;border-radius:10px;text-decoration:none;font-weight:bold;margin-bottom:10px}' +
-      '.secondary{background:#e5eee7;color:#19362d}.note{font-size:12px;margin-top:12px;color:#68776f}' +
+      'a,.copy{display:block;text-align:center;background:#21634c;color:#fff;padding:12px 14px;border-radius:10px;text-decoration:none;font-weight:bold;margin-bottom:10px;border:0;cursor:pointer;width:100%;box-sizing:border-box;font-size:14px}' +
+      '.secondary{background:#e5eee7;color:#19362d}.tertiary{background:#f4f7f4;color:#19362d;border:1px solid #dfe8e1}' +
+      '.note{font-size:12px;margin-top:12px;color:#68776f}.phone{font-weight:bold}.message{width:100%;box-sizing:border-box;border:1px solid #dfe8e1;border-radius:8px;padding:10px;font:12px/1.45 Arial,sans-serif;color:#19362d;min-height:105px;margin:4px 0 10px}' +
       '</style></head><body><h2>Appointment confirmed</h2>' +
       '<p>The unique Google Meet link is saved in the Requests tab. The slot is now CONFIRMED and hidden from patients.</p>' +
+      '<p>Patient mobile: <span class="phone">' + safePhone + '</span></p>' +
       '<a href="' + escapeHtml_(meetLink) + '">Join Google Meet as doctor →</a>' +
-      '<a class="secondary" href="' + escapeHtml_(waUrl) + '">Open WhatsApp to send patient link →</a>' +
-      '<p class="note">Review the WhatsApp message and press Send yourself. The Meet link is private; send it only to this patient.</p>' +
+      '<a href="' + escapeHtml_(waUrl) + '">Send via WhatsApp →</a>' +
+      '<a class="secondary" href="' + escapeHtml_(smsUrl) + '">Send via SMS / Messages →</a>' +
+      '<p class="note">If the patient isn't on WhatsApp, use SMS / Messages instead. On some computers, the SMS button may not open a messaging app; copy the message below and send it from your phone.</p>' +
+      '<label for="smsMessage"><strong>Confirmation message</strong></label>' +
+      '<textarea id="smsMessage" class="message" readonly>' + safeMessage + '</textarea>' +
+      '<button class="copy tertiary" onclick="var t=document.getElementById(\'smsMessage\');t.focus();t.select();try{document.execCommand(\'copy\');this.textContent=\'Message copied\';}catch(e){this.textContent=\'Select and copy the message above\';}">Copy confirmation message</button>' +
+      '<p class="note">Review the recipient and message before sending. The message is not sent automatically. Send the private Meet link only to this patient.</p>' +
       '</body></html>';
     ui.showModalDialog(HtmlService.createHtmlOutput(dialogHtml).setWidth(440).setHeight(350), 'Video consultation ready');
   } finally {
