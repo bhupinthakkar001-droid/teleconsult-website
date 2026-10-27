@@ -25,7 +25,7 @@ You do not need a Daily account or Daily API key for this version. Do not add a 
 2. Patients see only currently available slots. A submitted request is stored as `PENDING`, and the slot is hidden from the public calendar.
 3. To approve, open **Requests**, select the pending row, and choose **Teleconsult bookings → Approve request & create Google Meet**.
 4. The script creates a unique Google Calendar event with a new Meet conference link. The appointment is marked confirmed, and the Meet URL is saved in the Requests tab's `videoLink` column.
-5. The confirmation dialog offers **Join Google Meet as doctor** and **Open WhatsApp to send patient link**. Send the prefilled WhatsApp message yourself; it is not sent automatically.
+5. The confirmation dialog offers **Join Google Meet as doctor**, **Send via WhatsApp**, and **Send via SMS / Messages**. If the patient isn't on WhatsApp, use SMS / Messages. On computers without a messaging app, copy the confirmation message and send it from your phone. Messages are not sent automatically.
 6. To decline, select the pending request and choose **Teleconsult bookings → Decline selected request**. The slot becomes `AVAILABLE` again.
 
 The appointment appears on the doctor's primary Google Calendar. The script creates a 30-minute event starting at the selected appointment time. Check your Google Calendar time zone before using it with real patients.
@@ -33,7 +33,7 @@ The appointment appears on the doctor's primary Google Calendar. The script crea
 ## Privacy and test checklist
 
 - Keep the Google Sheet private; it contains patient names and mobile numbers.
-- Send the Meet link only to the patient whose appointment was confirmed.
+- Send the Meet link only to the patient whose appointment was confirmed. If they aren't on WhatsApp, use normal SMS or call them; SMS charges depend on your phone plan.
 - Use a unique Meet conference per appointment; do not reuse meeting links.
 - Test with dummy details before taking real consultations.
 - This approach does not embed the actual Google Meet UI into your page; it opens the Google Meet call in a new tab.
