@@ -23,7 +23,7 @@ body{background:var(--bg);min-height:100svh;display:flex;flex-direction:column}
 .rule{height:1px;background:var(--line);margin:21px 0 17px}
 .meta{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:13px;margin-top:9px}.dot{width:7px;height:7px;border-radius:50%;background:#58a477}
 .action{border-left:1px solid var(--line);padding-left:clamp(24px,4vw,54px)}
-.kicker{text-transform:uppercase;letter-spacing:.12em;font-size:11px;font-weight:850;color:var(--green)}
+.kicker{text-transform:uppercase;letter-spacing:.12em;font-size:11px;font-weight:850;color:var(--green)}.condition-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin:0 0 14px}.condition{display:flex;align-items:center;min-height:34px;padding:7px 8px;border:1px solid var(--line);border-radius:10px;background:#f8faf8;color:var(--ink);font-size:10px;line-height:1.25;font-weight:650}.condition:before{content:'•';color:#58a477;margin-right:5px;font-size:13px;flex-shrink:0}
 .action h2{font-size:clamp(28px,3.3vw,42px);line-height:1.08;letter-spacing:-.055em;margin:12px 0 11px;max-width:350px}
 .action p{color:var(--muted);font-size:15px;margin:0 0 25px;max-width:340px}
 .book{width:100%;min-height:68px;border:0;border-radius:17px;background:var(--green);color:white;font-size:18px;font-weight:800;letter-spacing:-.02em;display:flex;align-items:center;justify-content:center;gap:15px;cursor:pointer;box-shadow:0 10px 24px rgba(33,99,76,.16);transition:transform .15s,background .15s}
@@ -37,7 +37,7 @@ body{background:var(--bg);min-height:100svh;display:flex;flex-direction:column}
 .modal-head{display:flex;align-items:flex-start;justify-content:space-between;gap:15px;margin-bottom:18px}.modal-head h2{font-size:27px;letter-spacing:-.045em;line-height:1.1;margin:0 0 6px}.modal-head p{font-size:13px;color:var(--muted);margin:0}
 .close{width:36px;height:36px;flex:0 0 36px;border:0;border-radius:11px;background:#f1f5f1;color:var(--ink);font-size:22px;cursor:pointer}
 form{display:grid;gap:13px}.fields{display:grid;grid-template-columns:1fr 1fr;gap:12px}label{display:block;font-size:12px;font-weight:750;margin-bottom:6px}input,select{font:inherit;font-size:14px;width:100%;min-width:0;border:1px solid #d7e1d9;border-radius:11px;padding:12px;background:#fff;color:var(--ink)}input:focus,select:focus{outline:3px solid #d4e8d9;border-color:var(--green)}.submit{min-height:52px;border:0;border-radius:13px;background:var(--green);color:#fff;font:inherit;font-weight:800;font-size:15px;cursor:pointer;margin-top:3px}.submit:hover{background:var(--green-dark)}.submit:disabled{opacity:.55;cursor:not-allowed;transform:none}.fine{font-size:11px;line-height:1.45;color:var(--muted);margin:0}.notice{display:none;border-radius:12px;padding:12px;background:var(--pale);color:var(--green);font-size:13px;line-height:1.45}.notice.show{display:block}
-@media(max-width:760px){.topbar{height:58px}.stage{width:min(520px,92%);padding:6px 0 17px}.panel{grid-template-columns:1fr;gap:21px;padding:21px;border-radius:24px}.doctor{gap:17px}.photo{flex-basis:112px;width:112px;border-radius:18px}.info h1{font-size:clamp(23px,6vw,31px)}.qualification{font-size:13px}.qualification-place{font-size:11px}.rule{margin:12px 0 10px}.meta{font-size:12px;margin-top:7px}.action{border-left:0;border-top:1px solid var(--line);padding:20px 0 0}.action h2{font-size:28px;max-width:none;margin:7px 0}.action p{font-size:13px;margin-bottom:16px;max-width:none}.book{min-height:60px;font-size:17px}.under{margin-top:9px}.footer{padding-bottom:12px}}
+@media(max-width:760px){.condition-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}.condition{font-size:11px;min-height:34px}.topbar{height:58px}.stage{width:min(520px,92%);padding:6px 0 17px}.panel{grid-template-columns:1fr;gap:21px;padding:21px;border-radius:24px}.doctor{gap:17px}.photo{flex-basis:112px;width:112px;border-radius:18px}.info h1{font-size:clamp(23px,6vw,31px)}.qualification{font-size:13px}.qualification-place{font-size:11px}.rule{margin:12px 0 10px}.meta{font-size:12px;margin-top:7px}.action{border-left:0;border-top:1px solid var(--line);padding:20px 0 0}.action h2{font-size:28px;max-width:none;margin:7px 0}.action p{font-size:13px;margin-bottom:16px;max-width:none}.book{min-height:60px;font-size:17px}.under{margin-top:9px}.footer{padding-bottom:12px}}
 @media(max-width:370px){.panel{padding:16px}.doctor{gap:12px}.photo{flex-basis:95px;width:95px}.info h1{font-size:22px}.qualification{font-size:12px}.location{font-size:12px}.fields{grid-template-columns:1fr}.modal{padding:19px}}
 @media(min-width:761px) and (max-height:690px){.topbar{height:54px}.stage{padding-bottom:12px}.panel{padding:22px;gap:28px}.photo{width:142px;flex-basis:142px}.footer{padding-bottom:8px}}
 </style>
@@ -59,6 +59,14 @@ form{display:grid;gap:13px}.fields{display:grid;grid-template-columns:1fr 1fr;ga
     </div>
   </div>
   <div class="action">
+    <div class="condition-grid" aria-label="Conditions seen in internal medicine">
+      <div class="condition">Diabetes &amp; thyroid</div>
+      <div class="condition">High blood pressure</div>
+      <div class="condition">Fever &amp; infections</div>
+      <div class="condition">Cough &amp; breathing issues</div>
+      <div class="condition">Acidity &amp; digestive issues</div>
+      <div class="condition">Cholesterol &amp; lifestyle conditions</div>
+    </div>
     <h2>Book your appointment</h2>
     <p>Choose a date and time that works for you.</p>
     <button class="book" id="openBooking" type="button">Book Appointment <span class="arrow">→</span></button>
