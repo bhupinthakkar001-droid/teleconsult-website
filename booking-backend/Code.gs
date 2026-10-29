@@ -278,7 +278,7 @@ function approveSelectedRequest() {
       '<a href="' + escapeHtml_(meetLink) + '">Join Google Meet as doctor →</a>' +
       '<a href="' + escapeHtml_(waUrl) + '">Send via WhatsApp →</a>' +
       '<a class="secondary" href="' + escapeHtml_(smsUrl) + '">Send via SMS / Messages →</a>' +
-      '<p class="note">If the patient isn't on WhatsApp, use SMS / Messages instead. On some computers, the SMS button may not open a messaging app; copy the message below and send it from your phone.</p>' +
+      '<p class="note">If the patient does not use WhatsApp, use SMS / Messages instead. On some computers, the SMS button may not open a messaging app; copy the message below and send it from your phone.</p>' +
       '<label for="smsMessage"><strong>Confirmation message</strong></label>' +
       '<textarea id="smsMessage" class="message" readonly>' + safeMessage + '</textarea>' +
       '<button class="copy tertiary" onclick="var t=document.getElementById(\'smsMessage\');t.focus();t.select();try{document.execCommand(\'copy\');this.textContent=\'Message copied\';}catch(e){this.textContent=\'Select and copy the message above\';}">Copy confirmation message</button>' +
