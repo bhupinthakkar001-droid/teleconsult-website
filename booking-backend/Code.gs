@@ -262,7 +262,6 @@ function approveSelectedRequest() {
       'If you need to reschedule, please contact the doctor.'
     ].join('\\n');
     const waUrl = 'https://wa.me/' + patientPhone + '?text=' + encodeURIComponent(message);
-    const smsUrl = 'sms:+' + patientPhone + '?body=' + encodeURIComponent(message);
     const safeMessage = escapeHtml_(message);
     const safePhone = escapeHtml_(patientPhoneRaw);
 
@@ -277,8 +276,8 @@ function approveSelectedRequest() {
       '<p>Patient mobile: <span class="phone">' + safePhone + '</span></p>' +
       '<a href="' + escapeHtml_(meetLink) + '">Join Google Meet as doctor →</a>' +
       '<a href="' + escapeHtml_(waUrl) + '">Send via WhatsApp →</a>' +
-      '<a class="secondary" href="' + escapeHtml_(smsUrl) + '">Send via SMS / Messages →</a>' +
-      '<p class="note">If the patient does not use WhatsApp, use SMS / Messages instead. On some computers, the SMS button may not open a messaging app; copy the message below and send it from your phone.</p>' +
+      '<button class="copy secondary" onclick="var t=document.getElementById(\\'smsMessage\\');t.focus();t.select();try{document.execCommand(\\'copy\\');this.textContent=\\'Message copied — send it from your phone\\';}catch(e){this.textContent=\\'Select and copy the message below\\';}">Copy message for SMS / Messages</button>' +
+      '<p class="note">SMS cannot be sent automatically from this desktop dialog. Copy the message, open the Messages app on your phone, address it to the patient mobile shown above, paste the text, and send it.</p>' +
       '<label for="smsMessage"><strong>Confirmation message</strong></label>' +
       '<textarea id="smsMessage" class="message" readonly>' + safeMessage + '</textarea>' +
       '<button class="copy tertiary" onclick="var t=document.getElementById(\'smsMessage\');t.focus();t.select();try{document.execCommand(\'copy\');this.textContent=\'Message copied\';}catch(e){this.textContent=\'Select and copy the message above\';}">Copy confirmation message</button>' +
