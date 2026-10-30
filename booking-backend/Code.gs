@@ -1054,33 +1054,8 @@ function normalizeDigits_(value) {
 
 
 
-/* ---------------- CONSULTATION WORKSPACE ---------------- */
-function getConsultationsSheet_() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  let sheet = ss.getSheetByName('Consultations');
-  const headers = [
-    'requestId','patientName','patientPhone','appointmentDate','appointmentTime',
-    'age','sex','allergies','currentMedicines','bloodPressure','pulse','respiratoryRate',
-    'temperature','spo2','weight','height','clinicalHistory','examination',
-    'assessmentDiagnosis','investigations','treatmentPlan','followUpAdvice',
-    'followUpDate','noteStatus','createdAt','updatedAt'
-  ];
-  if (!sheet) sheet = ss.insertSheet('Consultations');
-  if (sheet.getLastRow() === 0) {
-    sheet.getRange(1,1,1,headers.length).setValues([headers]);
-    sheet.setFrozenRows(1);
-    sheet.getRange(1,1,1,headers.length).setFontWeight('bold');
-    sheet.getRange('A:Z').setNumberFormat('@');
-  } else {
-    const firstHeader = String(sheet.getRange(1,1).getDisplayValue() || '');
-    if (firstHeader !== 'requestId') {
-      throw new Error('The Consultations sheet exists but has an unexpected layout. Please do not edit it manually; contact support before proceeding.');
-    }
-  }
-  return sheet;
-}
-
-function findConfirmedBookingForConsultation_(requestId) {
+/* ---------------- CONFIRMED BOOKING LOOKUP FOR PRESCRIPTION ---------------- */
+function findConfirmedBookingForPrescription_(requestId) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(REQUESTS_SHEET);
   if (!sheet || sheet.getLastRow() < 2) throw new Error('No booking records were found.');
   const rows = sheet.getDataRange().getDisplayValues();
@@ -1088,7 +1063,7 @@ function findConfirmedBookingForConsultation_(requestId) {
     const r = rows[i];
     if (String(r[0]) === String(requestId)) {
       if (String(r[7]).toUpperCase() !== 'CONFIRMED') {
-        throw new Error('A consultation record can only be opened for a confirmed appointment.');
+        throw new Error('A prescription can only be started from a confirmed appointment.');
       }
       return {
         requestId:String(r[0]), appointmentDate:String(r[2]), appointmentTime:String(r[3]),
@@ -1101,100 +1076,14 @@ function findConfirmedBookingForConsultation_(requestId) {
   throw new Error('The appointment could not be found. Refresh the dashboard and try again.');
 }
 
-function adminGetConsultation(token, requestId) {
-  requireAdminSession_(token);
-  const booking = findConfirmedBookingForConsultation_(cleanText_(requestId,80));
-  const sheet = getConsultationsSheet_();
-  let consultation = {};
-  if (sheet.getLastRow() >= 2) {
-    const rows = sheet.getRange(2,1,sheet.getLastRow()-1,26).getDisplayValues();
-    for (let i = 0; i < rows.length; i++) {
-      if (String(rows[i][0]) === booking.requestId) {
-        const r = rows[i];
-        consultation = {
-          age:r[5], sex:r[6], allergies:r[7], currentMedicines:r[8],
-          bloodPressure:r[9], pulse:r[10], respiratoryRate:r[11], temperature:r[12],
-          spo2:r[13], weight:r[14], height:r[15], clinicalHistory:r[16],
-          examination:r[17], assessmentDiagnosis:r[18], investigations:r[19],
-          treatmentPlan:r[20], followUpAdvice:r[21], followUpDate:r[22],
-          noteStatus:r[23], createdAt:r[24], updatedAt:r[25]
-        };
-        break;
-      }
-    }
-  }
-  return {ok:true, booking:booking, consultation:consultation};
-}
-
-function adminSaveConsultation(token, requestId, payload, requestedStatus) {
-  requireAdminSession_(token);
-  const lock = LockService.getScriptLock();
-  lock.waitLock(10000);
-  try {
-    const booking = findConfirmedBookingForConsultation_(cleanText_(requestId,80));
-    const p = payload || {};
-    const status = String(requestedStatus || 'DRAFT').toUpperCase() === 'COMPLETED' ? 'COMPLETED' : 'DRAFT';
-    const fields = {
-      age:cleanText_(p.age,20),
-      sex:cleanText_(p.sex,30),
-      allergies:cleanMultilineText_(p.allergies,1000),
-      currentMedicines:cleanMultilineText_(p.currentMedicines,2000),
-      bloodPressure:cleanText_(p.bloodPressure,50),
-      pulse:cleanText_(p.pulse,30),
-      respiratoryRate:cleanText_(p.respiratoryRate,30),
-      temperature:cleanText_(p.temperature,30),
-      spo2:cleanText_(p.spo2,30),
-      weight:cleanText_(p.weight,30),
-      height:cleanText_(p.height,30),
-      clinicalHistory:cleanMultilineText_(p.clinicalHistory,5000),
-      examination:cleanMultilineText_(p.examination,3000),
-      assessmentDiagnosis:cleanMultilineText_(p.assessmentDiagnosis,2000),
-      investigations:cleanMultilineText_(p.investigations,2000),
-      treatmentPlan:cleanMultilineText_(p.treatmentPlan,4000),
-      followUpAdvice:cleanMultilineText_(p.followUpAdvice,2000),
-      followUpDate:/^\d{4}-\d{2}-\d{2}$/.test(String(p.followUpDate || '')) ? String(p.followUpDate) : ''
-    };
-    if (status === 'COMPLETED' && (!fields.assessmentDiagnosis || !fields.treatmentPlan)) {
-      throw new Error('Add the assessment/diagnosis and treatment plan before marking this consultation completed.');
-    }
-    const sheet = getConsultationsSheet_();
-    const now = Utilities.formatDate(new Date(),TIME_ZONE,'yyyy-MM-dd HH:mm:ss');
-    let targetRow = -1, createdAt = now;
-    if (sheet.getLastRow() >= 2) {
-      const ids = sheet.getRange(2,1,sheet.getLastRow()-1,1).getDisplayValues();
-      for (let i=0; i<ids.length; i++) {
-        if (String(ids[i][0]) === booking.requestId) {
-          targetRow = i + 2;
-          createdAt = String(sheet.getRange(targetRow,25).getDisplayValue() || now);
-          break;
-        }
-      }
-    }
-    const row = [
-      booking.requestId, safeCell_(booking.patientName), safeCell_(booking.patientPhone),
-      booking.appointmentDate, booking.appointmentTime,
-      fields.age, fields.sex, fields.allergies, fields.currentMedicines,
-      fields.bloodPressure, fields.pulse, fields.respiratoryRate, fields.temperature,
-      fields.spo2, fields.weight, fields.height, fields.clinicalHistory, fields.examination,
-      fields.assessmentDiagnosis, fields.investigations, fields.treatmentPlan,
-      fields.followUpAdvice, fields.followUpDate, status, createdAt, now
-    ].map(function(v){ return safeCell_(v); });
-    if (targetRow > 0) sheet.getRange(targetRow,1,1,26).setValues([row]);
-    else sheet.appendRow(row);
-    return {ok:true, status:status, updatedAt:now, message:status==='COMPLETED'?'Consultation marked completed and saved.':'Consultation draft saved.'};
-  } finally {
-    lock.releaseLock();
-  }
-}
-
-
 /* ---------------- ONE-TIME PRESCRIPTION HANDOFF ----------------
+
    Transfers only a short-lived, single-use payload to the authenticated
    prescription app. No patient details are placed in the URL.
 */
 function adminCreatePrescriptionHandoff(token, requestId) {
   requireAdminSession_(token);
-  const booking = findConfirmedBookingForConsultation_(cleanText_(requestId,80));
+  const booking = findConfirmedBookingForPrescription_(cleanText_(requestId,80));
   if (!/\b(test|fictional|demo)\b/i.test(booking.patientName)) {
     throw new Error('The connected AI Clinic app is a test-only prototype. For safety, handoff is restricted to a clearly labelled fictional/demo booking. Real patient information cannot be transferred.');
   }
