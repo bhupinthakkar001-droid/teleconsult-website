@@ -47,6 +47,7 @@ textarea{resize:vertical;min-height:76px;line-height:1.45}
 .consent-row input[type=checkbox]{width:18px;height:18px;flex:0 0 18px;margin:2px 0 0;accent-color:var(--green)}
 .consent-row label{font-size:12px;font-weight:550;line-height:1.45;margin:0}
 .service-info{border:1px solid var(--line);border-radius:12px;padding:12px;background:#f8faf8;font-size:12px;line-height:1.5;color:var(--muted)}
+.payment-box{border:1px solid #cbded0;border-radius:14px;padding:14px;background:#f6faf6;display:grid;gap:9px}.payment-title{font-size:14px;font-weight:850;color:var(--ink)}.payment-help{font-size:12px;line-height:1.45;color:var(--muted);margin:0}.upi-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.upi-id{font-size:14px;font-weight:850;color:var(--green);overflow-wrap:anywhere}.copy-upi{border:1px solid var(--line);border-radius:9px;background:white;color:var(--green);padding:8px 10px;font:inherit;font-size:12px;font-weight:750;cursor:pointer}.upi-pay{display:flex;align-items:center;justify-content:center;border-radius:11px;background:var(--green);color:white!important;text-decoration:none;padding:12px;font-size:13px;font-weight:800}.upi-qr{display:block;width:190px;max-width:100%;height:auto;object-fit:contain;border:1px solid var(--line);border-radius:12px;background:white;padding:7px}.payment-field input{width:100%}
 .service-info strong{color:var(--ink)}
 .emergency-note{border:1px solid #efc7c2;border-radius:12px;padding:12px;background:#fff6f4;color:#8d2c23;font-size:12px;line-height:1.5}.submit{min-height:52px;border:0;border-radius:13px;background:var(--green);color:#fff;font:inherit;font-weight:800;font-size:15px;cursor:pointer;margin-top:3px}.submit:hover{background:var(--green-dark)}.submit:disabled{opacity:.55;cursor:not-allowed;transform:none}.fine{font-size:11px;line-height:1.45;color:var(--muted);margin:0}.notice{display:none;border-radius:12px;padding:12px;background:var(--pale);color:var(--green);font-size:13px;line-height:1.45}.notice.show{display:block}
 @media(max-width:760px){.condition-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}.condition{font-size:11px;min-height:34px}.topbar{height:58px}.stage{width:min(520px,92%);padding:6px 0 17px}.panel{grid-template-columns:1fr;gap:21px;padding:21px;border-radius:24px}.doctor{gap:17px}.photo{flex-basis:112px;width:112px;border-radius:18px}.info h1{font-size:clamp(23px,6vw,31px)}.qualification{font-size:13px}.qualification-place{font-size:11px}.rule{margin:12px 0 10px}.meta{font-size:12px;margin-top:7px}.action{border-left:0;border-top:1px solid var(--line);padding:20px 0 0}.action h2{font-size:28px;max-width:none;margin:7px 0}.action p{font-size:13px;margin-bottom:16px;max-width:none}.book{min-height:60px;font-size:17px}.under{margin-top:9px}.footer{padding-bottom:12px}}
@@ -97,7 +98,20 @@ textarea{resize:vertical;min-height:76px;line-height:1.45}
       <div><label for="patientName">Your name</label><input id="patientName" name="patientName" required autocomplete="name" maxlength="80" placeholder="Full name"></div>
       <div><label for="phone">Mobile number</label><input id="phone" name="phone" type="tel" required autocomplete="tel" inputmode="tel" maxlength="18" placeholder="Phone number"></div>
       <div><label for="serviceLevel">Consultation option</label><select id="serviceLevel" name="serviceLevel" required><option value="REGULAR">Regular consultation · ₹500</option><option value="PRIORITY">Priority response consultation · ₹2,000</option></select></div>
-      <div class="service-info" id="serviceInfo"><strong>Regular consultation · ₹500</strong><br>Choose any available appointment date and time. Payment arrangements will be confirmed directly by the doctor.</div>
+      <div class="service-info" id="serviceInfo"><strong>Regular consultation · ₹500</strong><br>Pay the exact consultation fee by UPI before submitting your request. The doctor will manually verify the transaction reference.</div>
+      <div class="payment-box" aria-label="UPI payment details">
+        <div class="payment-title">1. Pay the consultation fee</div>
+        <p class="payment-help" id="paymentSetupMessage">Loading payment details…</p>
+        <div id="paymentMethods" class="hidden">
+          <div class="upi-row"><span class="upi-id" id="upiIdDisplay"></span><button class="copy-upi" id="copyUpiButton" type="button">Copy UPI ID</button></div>
+          <div class="payment-help" id="upiPayeeDisplay"></div>
+          <img id="upiQrImage" class="upi-qr hidden" alt="Doctor UPI QR code" loading="lazy">
+          <a id="upiPayLink" class="upi-pay" href="#" target="_blank" rel="noopener">Open UPI app to pay</a>
+          <p class="payment-help">Pay only to the UPI ID shown above. Verify the payee name and exact amount in your UPI app before paying. Never share your UPI PIN or OTP.</p>
+        </div>
+      </div>
+      <div class="payment-field"><label for="paymentReference">2. UPI transaction reference / UTR</label><input id="paymentReference" name="paymentReference" required maxlength="40" minlength="6" pattern="[A-Za-z0-9]{6,40}" autocomplete="off" placeholder="Enter UPI reference after payment"><p class="fine">Enter the transaction ID / UTR from your UPI app after a successful payment.</p></div>
+      <div class="consent-row"><input id="paymentMade" name="paymentMade" type="checkbox" value="yes" required><label for="paymentMade" id="paymentDeclarationText">I have paid the displayed consultation fee using UPI and entered the correct transaction reference. I understand that payment is manually verified and the appointment is not confirmed until the doctor approves it.</label></div>
       <div class="fields">
         <div><label for="date">Available date</label><select id="date" name="date" required disabled><option value="">Loading slots…</option></select></div>
         <div><label for="time">Available time</label><select id="time" name="time" required disabled><option value="">Choose date first</option></select></div>
@@ -107,7 +121,7 @@ textarea{resize:vertical;min-height:76px;line-height:1.45}
       <div><label for="presentingComplaint">What problem are you consulting for, and for how long?</label><textarea id="presentingComplaint" name="presentingComplaint" rows="2" maxlength="1000" minlength="3" required placeholder="For example: fever for 3 days, headache for 1 week"></textarea></div>
       <div><label for="medicalHistory">Any existing diseases or past medical history? <span style="font-weight:500;color:var(--muted)">(Optional)</span></label><textarea id="medicalHistory" name="medicalHistory" rows="2" maxlength="1000" placeholder="For example: diabetes, high BP, asthma, heart or kidney disease"></textarea></div>
       <div class="consent-row"><input id="onlineConsultConsent" name="onlineConsultConsent" type="checkbox" value="yes" required><label for="onlineConsultConsent">I request a video consultation. I understand that remote assessment may limit physical examination and that the doctor may recommend an in-person assessment when needed.</label></div>
-      <div class="consent-row"><input id="dataUseConsent" name="dataUseConsent" type="checkbox" value="yes" required><label for="dataUseConsent">I consent to Dr. Bhupin using my name, mobile number and health details submitted here for booking, consultation, follow-up and maintaining medical records. <a href="./privacy.html" target="_blank" rel="noopener">Read the Privacy Notice</a>.</label></div>
+      <div class="consent-row"><input id="dataUseConsent" name="dataUseConsent" type="checkbox" value="yes" required><label for="dataUseConsent">I consent to Dr. Bhupin using my name, mobile number, health details and UPI transaction reference submitted here for booking, payment verification, consultation, follow-up and maintaining medical records. <a href="./privacy.html" target="_blank" rel="noopener">Read the Privacy Notice</a>.</label></div>
       <input name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px" value="">
       <button class="submit" id="submitBooking" type="submit">Request Appointment</button>
       <p class="fine">Your slot will be held as pending when you submit the form. The doctor must approve it before the appointment is confirmed.</p>
@@ -157,6 +171,14 @@ const submitButton=document.getElementById('submitBooking');
 const serviceLevelSelect=document.getElementById('serviceLevel');
 const priorityOption=serviceLevelSelect.querySelector('option[value="PRIORITY"]');
 const serviceInfo=document.getElementById('serviceInfo');
+const paymentSetupMessage=document.getElementById('paymentSetupMessage');
+const paymentMethods=document.getElementById('paymentMethods');
+const upiIdDisplay=document.getElementById('upiIdDisplay');
+const upiPayeeDisplay=document.getElementById('upiPayeeDisplay');
+const upiQrImage=document.getElementById('upiQrImage');
+const upiPayLink=document.getElementById('upiPayLink');
+let paymentSettings={enabled:false,upiId:'',payeeName:'',qrImageUrl:''};
+let paymentReady=false;
 let availableSlots=[];
 function showNotice(message){notice.textContent=message;notice.classList.add('show')}
 function openModal(){modal.classList.add('open');document.body.style.overflow='hidden';setTimeout(()=>document.getElementById('patientName').focus(),30)}
@@ -261,16 +283,59 @@ function loadBookingOptions(){
   const script=document.createElement('script');
   script.src=BOOKING_API_URL+'?action=bookingOptions&callback=receiveTeleconsultBookingOptions&_='+Date.now();
   script.onerror=()=>{ /* Keep option visible; the booking server validates availability on submission. */ };
+  document.head.appendChild(script);
 }
+function loadPaymentOptions(){
+  if(!apiReady){paymentSetupMessage.textContent='Payment service is not connected. Please contact the doctor.';return;}
+  window.receiveTeleconsultPaymentOptions=function(payload){
+    paymentSettings=payload&&payload.ok===true&&payload.payment?payload.payment:{enabled:false};
+    paymentReady=!!paymentSettings.enabled&&!!paymentSettings.upiId;
+    updatePaymentDisplay();
+    updateDateOptions();
+  };
+  const script=document.createElement('script');
+  script.src=BOOKING_API_URL+'?action=paymentOptions&callback=receiveTeleconsultPaymentOptions&_='+Date.now();
+  script.onerror=()=>{paymentReady=false;paymentSetupMessage.textContent='Payment details could not be loaded. Refresh the page or contact the doctor.';updateDateOptions();};
+  document.head.appendChild(script);
+}
+function updatePaymentDisplay(){
+  const amount=serviceLevelSelect.value==='PRIORITY'?'2000':'500';
+  const amountLabel='₹'+Number(amount).toLocaleString('en-IN');
+  document.getElementById('paymentDeclarationText').textContent='I have paid '+amountLabel+' using UPI and entered the correct transaction reference. I understand that payment is manually verified and the appointment is not confirmed until the doctor approves it.';
+  if(!paymentReady){
+    paymentMethods.classList.add('hidden');
+    paymentSetupMessage.textContent='UPI payment details have not been configured yet. Booking will open once the doctor adds the UPI ID.';
+    return;
+  }
+  paymentSetupMessage.textContent='Consultation amount: '+amountLabel+'. Use the UPI ID, QR code (if displayed), or UPI app button below.';
+  paymentMethods.classList.remove('hidden');
+  upiIdDisplay.textContent=paymentSettings.upiId;
+  upiPayeeDisplay.textContent='Payee: '+(paymentSettings.payeeName||'Dr. Bhupin Thakkar');
+  const upiUri='upi://pay?pa='+encodeURIComponent(paymentSettings.upiId)+'&pn='+encodeURIComponent(paymentSettings.payeeName||'Dr. Bhupin Thakkar')+'&am='+amount+'&cu=INR&tn='+encodeURIComponent('Consultation fee - Dr Bhupin');
+  upiPayLink.href=upiUri;
+  if(paymentSettings.qrImageUrl && /^https:\/\//i.test(paymentSettings.qrImageUrl)){
+    upiQrImage.src=paymentSettings.qrImageUrl;
+    upiQrImage.classList.remove('hidden');
+  }else{
+    upiQrImage.removeAttribute('src');
+    upiQrImage.classList.add('hidden');
+  }
+}
+document.getElementById('copyUpiButton').addEventListener('click',()=>{
+  if(!paymentSettings.upiId)return;
+  const fallback=()=>{const field=document.createElement('textarea');field.value=paymentSettings.upiId;document.body.appendChild(field);field.select();try{document.execCommand('copy');paymentSetupMessage.textContent='UPI ID copied.';}catch(e){paymentSetupMessage.textContent='Please copy the UPI ID manually.';}field.remove();};
+  if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(paymentSettings.upiId).then(()=>{paymentSetupMessage.textContent='UPI ID copied.';}).catch(fallback);else fallback();
+});
 function slotsForSelectedService(){
   return availableSlots;
 }
 function updateServiceLevel(){
   if(serviceLevelSelect.value==='PRIORITY'){
-    serviceInfo.innerHTML='<strong>Priority response consultation · ₹2,000</strong><br>We will respond to your booking request within 30 minutes. Your consultation time will be arranged from available slots and confirmed by the doctor. Payment arrangements will be confirmed directly.';
+    serviceInfo.innerHTML='<strong>Priority response consultation · ₹2,000</strong><br>Priority requests target a response within 30 minutes after receipt of a valid request. This is not an emergency service.';
   }else{
-    serviceInfo.innerHTML='<strong>Regular consultation · ₹500</strong><br>Choose any available appointment date and time. Payment arrangements will be confirmed directly by the doctor.';
+    serviceInfo.innerHTML='<strong>Regular consultation · ₹500</strong><br>Select an available date and time for your video consultation.';
   }
+  updatePaymentDisplay();
   updateDateOptions();
 }
 function updateDateOptions(){
@@ -288,13 +353,10 @@ function updateDateOptions(){
     updateTimes();
   }
   if(!dates.length){
-    const priority=serviceLevelSelect.value==='PRIORITY';
     dateSelect.innerHTML='<option value="">No appointment slots available</option>';
     timeSelect.innerHTML='<option value="">No available times</option>';
-    submitButton.disabled=true;
-  }else{
-    submitButton.disabled=false;
   }
+  submitButton.disabled=!paymentReady||!dates.length;
 }
 serviceLevelSelect.addEventListener('change',updateServiceLevel);
 dateSelect.addEventListener('change',updateTimes);
@@ -302,6 +364,7 @@ timeSelect.addEventListener('change',()=>{slotInput.value=timeSelect.value});
 form.addEventListener('submit',e=>{
   e.preventDefault();
   notice.classList.remove('show');
+  if(!paymentReady){showNotice('UPI payment details are not configured yet. Please contact the doctor.');return;}
   if(!form.reportValidity()) return;
   if(!slotInput.value){
     showNotice('Please select an available date and time.');return;
@@ -310,9 +373,7 @@ form.addEventListener('submit',e=>{
   if(!chosen){
     showNotice('That slot is no longer available. Please refresh and select another time.');return;
   }
-  showNotice(serviceLevelSelect.value==='PRIORITY'
-    ? 'Your ₹2,000 priority response request is being submitted. We will respond within 30 minutes. Your consultation slot is subject to availability and doctor confirmation. This is not an emergency service.'
-    : 'Your ₹500 regular appointment request is being submitted. The slot will be held as pending until the doctor approves it.');
+  showNotice('Your booking request and UPI reference are being submitted. The payment will be manually verified; your appointment is not confirmed until the doctor approves it.');
   submitButton.disabled=true;
   submitButton.textContent='Submitting request…';
   form.submit();
@@ -320,6 +381,7 @@ form.addEventListener('submit',e=>{
 loadSlots();
 updateServiceLevel();
 loadBookingOptions();
+loadPaymentOptions();
 </script>
 </body>
 </html>
