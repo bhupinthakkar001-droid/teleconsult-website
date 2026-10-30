@@ -89,6 +89,24 @@ function doGet(e) {
     }
     return jsonOutput(result);
   }
+  if (String(p.action || '') === 'prescriptionSaveStatus') {
+    const nonce=String(p.nonce||'').replace(/[^A-Za-z0-9_-]/g,'').slice(0,80);
+    const callback=String(p.callback||'');
+    let result={ok:true,done:false};
+    if(!/^[A-Za-z0-9_-]{16,80}$/.test(nonce)) result={ok:false,done:true,message:'Invalid prescription save status request.'};
+    else {
+      const saved=CacheService.getScriptCache().get('RX_SAVE_RESULT_'+nonce);
+      if(saved) {
+        try { result=JSON.parse(saved); }
+        catch(err) { result={ok:false,done:true,message:'The save result could not be read.'}; }
+      }
+    }
+    const payload=JSON.stringify(result);
+    if(callback && /^[A-Za-z_$][0-9A-Za-z_$]*$/.test(callback)) {
+      return ContentService.createTextOutput(callback+'('+payload+');').setMimeType(ContentService.MimeType.JAVASCRIPT);
+    }
+    return jsonOutput(result);
+  }
   if (String(p.action || '') === 'bookingOptions') {
     const payload=JSON.stringify({ok:true,priorityEnabled:getPriorityBookingsEnabled_()});
     const callback=String(p.callback||'');
@@ -1339,10 +1357,13 @@ function handlePrescriptionSaveToEmr_(p) {
   }catch(err){
     result={ok:false,error:err&&err.message?err.message:'Could not save prescription to EMR.'};
   }
-  const message={type:'teleconsult-emr-prescription-save',nonce:nonce,ok:!!result.ok,
-    prescriptionId:result.prescriptionId||'',pdfUrl:result.pdfUrl||'',message:result.message||result.error||''};
-  const html='<!doctype html><html><body><script>window.parent.postMessage('+JSON.stringify(message)+',"*");</script>Prescription save processed.</body></html>';
-  return HtmlService.createHtmlOutput(html).setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  const message={ok:!!result.ok,done:true,prescriptionId:result.prescriptionId||'',
+    pdfUrl:result.pdfUrl||'',message:result.message||result.error||''};
+  if(/^[A-Za-z0-9_-]{16,80}$/.test(nonce)) {
+    CacheService.getScriptCache().put('RX_SAVE_RESULT_'+nonce,JSON.stringify(message),300);
+  }
+  return HtmlService.createHtmlOutput('Prescription save processed. You may close this frame.')
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
 /* ---------------- ONE-TIME PRESCRIPTION HANDOFF ----------------
