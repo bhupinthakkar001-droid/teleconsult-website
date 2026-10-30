@@ -893,7 +893,9 @@ function adminDecideChangeRequest(token, changeId, approve) {
       if(change[5]) releaseChangeHeldSlot_(slots,change[5],change[1]);
       changes.getRange(changeRow,9).setValue('DECLINED');
       changes.getRange(changeRow,11).setValue(now);
-      return {ok:true,message:'Change request declined. The original appointment remains confirmed.'};
+      return {ok:true,message:'Change request declined. The original appointment remains confirmed.',
+        changeType:change[4],patientName:req[4],patientPhone:normalizeWhatsAppPhone_(req[5]),
+        date:req[2],time:req[3],newDate:change[6],newTime:change[7]};
     }
 
     if(change[4]==='CANCEL') {
@@ -904,7 +906,8 @@ function adminDecideChangeRequest(token, changeId, approve) {
       if(req[11] && typeof Calendar!=='undefined' && Calendar.Events) {
         try { Calendar.Events.remove('primary',String(req[11])); } catch(ignored) {}
       }
-      return {ok:true,message:'Appointment cancelled and its slot released.'};
+      return {ok:true,message:'Appointment cancelled and its slot released.',
+        changeType:'CANCEL',patientName:req[4],patientPhone:normalizeWhatsAppPhone_(req[5]),date:req[2],time:req[3]};
     }
 
     if(change[4]==='RESCHEDULE') {
@@ -931,7 +934,9 @@ function adminDecideChangeRequest(token, changeId, approve) {
       if(req[11] && typeof Calendar!=='undefined' && Calendar.Events) {
         try { Calendar.Events.remove('primary',String(req[11])); } catch(ignored) {}
       }
-      return {ok:true,message:'Appointment rescheduled. A new Google Meet link has been created.'};
+      return {ok:true,message:'Appointment rescheduled. A new Google Meet link has been created.',
+        changeType:'RESCHEDULE',patientName:req[4],patientPhone:normalizeWhatsAppPhone_(req[5]),
+        date:String(target[1]),time:String(target[2]),meetLink:created.meetLink};
     }
     throw new Error('Unsupported change request.');
   } finally {
