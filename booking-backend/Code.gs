@@ -1195,7 +1195,7 @@ function adminSaveConsultation(token, requestId, payload, requestedStatus) {
 function adminCreatePrescriptionHandoff(token, requestId, formPayload) {
   requireAdminSession_(token);
   const booking = findConfirmedBookingForConsultation_(cleanText_(requestId,80));
-  if (!/(test|fictional|demo)/i.test(booking.patientName)) {
+  if (!/\b(test|fictional|demo)\b/i.test(booking.patientName)) {
     throw new Error('The connected AI Clinic app is a test-only prototype. For safety, handoff is restricted to a clearly labelled fictional/demo booking. Real patient information cannot be transferred.');
   }
   const p = formPayload || {};
