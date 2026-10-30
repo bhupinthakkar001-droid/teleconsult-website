@@ -22,6 +22,13 @@
     a.action{display:inline-flex;align-items:center;justify-content:center;text-decoration:none;border-radius:12px;padding:12px 15px;font:700 14px system-ui;flex:1}
     a.action.primary{background:var(--green);color:white}
     a.action.whatsapp{background:#e5f5e9;color:#176b38;border:1px solid #bfe5c9}
+    .slot-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .field-label{display:block;font-size:13px;font-weight:700;margin-top:4px}
+    .slot-form-actions{display:flex;gap:8px;margin-top:8px}
+    .slot-form-actions button{flex:1}
+    .slot-actions{display:flex;gap:8px;margin-top:12px}
+    .slot-actions button{flex:1}
+    @media(max-width:420px){.slot-grid{grid-template-columns:1fr}.slot-form-actions{flex-direction:column}}
   </style>
 </head>
 <body>
@@ -39,23 +46,49 @@
       <div class="card" style="flex:1;margin:0"><div class="muted">Pending</div><div id="pendingCount" style="font-size:28px;font-weight:800">0</div></div>
       <div class="card" style="flex:1;margin:0"><div class="muted">Confirmed</div><div id="confirmedCount" style="font-size:28px;font-weight:800">0</div></div>
     </div>
-    <div class="tabs"><button id="pendingTab" class="active" onclick="showTab('pending')">Pending</button><button id="confirmedTab" onclick="showTab('confirmed')">Confirmed</button></div>
+    <div class="tabs"><button id="pendingTab" class="active" onclick="showTab('pending')">Pending</button><button id="confirmedTab" onclick="showTab('confirmed')">Confirmed</button><button id="slotsTab" onclick="showTab('slots')">Manage slots</button></div>
     <div id="notice" class="muted" style="margin:8px 2px"></div>
     <div id="requestList"></div>
-    <button class="secondary full" onclick="loadRequests()">Refresh appointments</button>
+    <button id="requestRefresh" class="secondary full" onclick="loadRequests()">Refresh appointments</button>
+    <section id="slotPanel" class="hidden">
+      <div class="card">
+        <h2 id="slotFormTitle">Add appointment slots</h2>
+        <div class="muted">Choose a future date and time. Patients will see slots marked AVAILABLE.</div>
+        <div class="slot-grid">
+          <div><label class="field-label" for="slotDate">Appointment date</label><input id="slotDate" type="date"></div>
+          <div><label class="field-label" for="slotTime">Appointment time</label><input id="slotTime" type="time"></div>
+        </div>
+        <div class="slot-form-actions">
+          <button id="saveSlotBtn" class="primary" type="button" onclick="saveSlot()">Add available slot</button>
+          <button id="cancelEditBtn" class="secondary hidden" type="button" onclick="resetSlotForm()">Cancel edit</button>
+        </div>
+        <div id="slotFormMessage" class="error"></div>
+      </div>
+      <div id="slotList"></div>
+      <button class="secondary full" type="button" onclick="loadSlots()">Refresh slots</button>
+    </section>
   </section>
 </div>
 <script>
-let sessionToken='', currentTab='pending', data={pending:[],confirmed:[]};
+let sessionToken='', currentTab='pending', data={pending:[],confirmed:[]}, slotsData=[], editingSlotId='';
 function showError(id,msg){document.getElementById(id).textContent=msg||''}
 function login(){
   const btn=document.getElementById('loginBtn');btn.disabled=true;btn.textContent='Signing in…';showError('loginError','');
-  google.script.run.withSuccessHandler(r=>{sessionToken=r.token;document.getElementById('login').classList.add('hidden');document.getElementById('dashboard').classList.remove('hidden');document.getElementById('logout').classList.remove('hidden');loadRequests();})
+  google.script.run.withSuccessHandler(r=>{sessionToken=r.token;document.getElementById('login').classList.add('hidden');document.getElementById('dashboard').classList.remove('hidden');document.getElementById('logout').classList.remove('hidden');document.getElementById('slotDate').min=localDateString();loadRequests();})
     .withFailureHandler(e=>{showError('loginError',e.message||String(e));btn.disabled=false;btn.textContent='Sign in';})
     .adminLogin(document.getElementById('password').value);
 }
 function logout(){sessionToken='';document.getElementById('dashboard').classList.add('hidden');document.getElementById('logout').classList.add('hidden');document.getElementById('login').classList.remove('hidden');document.getElementById('password').value='';}
-function showTab(tab){currentTab=tab;document.getElementById('pendingTab').classList.toggle('active',tab==='pending');document.getElementById('confirmedTab').classList.toggle('active',tab==='confirmed');render();}
+function showTab(tab){
+  currentTab=tab;
+  document.getElementById('pendingTab').classList.toggle('active',tab==='pending');
+  document.getElementById('confirmedTab').classList.toggle('active',tab==='confirmed');
+  document.getElementById('slotsTab').classList.toggle('active',tab==='slots');
+  document.getElementById('requestList').classList.toggle('hidden',tab==='slots');
+  document.getElementById('requestRefresh').classList.toggle('hidden',tab==='slots');
+  document.getElementById('slotPanel').classList.toggle('hidden',tab!=='slots');
+  if(tab==='slots')loadSlots();else render();
+}
 function loadRequests(successNotice){
   document.getElementById('notice').textContent='Loading appointments…';
   google.script.run.withSuccessHandler(r=>{data=r;document.getElementById('pendingCount').textContent=r.pending.length;document.getElementById('confirmedCount').textContent=r.confirmed.length;document.getElementById('notice').innerHTML=successNotice||'';render();})
@@ -64,6 +97,7 @@ function loadRequests(successNotice){
 }
 function esc(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function render(){
+  if(currentTab==='slots')return;
   const items=data[currentTab]||[], root=document.getElementById('requestList');
   if(!items.length){root.innerHTML='<div class="card empty">No '+currentTab+' appointments.</div>';return;}
   root.innerHTML=items.map(x=>{
@@ -84,6 +118,86 @@ function render(){
     }
     return '<article class="card"><div class="row" style="justify-content:space-between;align-items:center"><div class="name">'+esc(x.patientName)+'</div><span class="pill">'+esc(x.status)+'</span></div><div class="meta">'+esc(x.date)+' · '+esc(x.time)+'</div><div class="meta">'+esc(x.visitType)+'</div><div class="meta">Mobile: '+esc(x.patientPhone)+'</div><div class="meta small">Request ID: '+esc(x.requestId)+'</div>'+actions+'</article>';
   }).join('');
+}
+function localDateString(){
+  const d=new Date(),y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),day=String(d.getDate()).padStart(2,'0');
+  return y+'-'+m+'-'+day;
+}
+function loadSlots(successMessage){
+  document.getElementById('notice').textContent='Loading appointment slots…';
+  google.script.run.withSuccessHandler(r=>{
+    slotsData=r.slots||[];
+    document.getElementById('notice').textContent=successMessage||'';
+    renderSlots();
+  }).withFailureHandler(e=>{
+    document.getElementById('notice').textContent=e.message||String(e);
+    if((e.message||'').toLowerCase().includes('session expired'))logout();
+  }).adminGetSlots(sessionToken);
+}
+function renderSlots(){
+  const root=document.getElementById('slotList');
+  if(!slotsData.length){root.innerHTML='<div class="card empty">No upcoming slots. Add your first appointment slot above.</div>';return;}
+  root.innerHTML=slotsData.map(x=>{
+    const available=x.status==='AVAILABLE';
+    const controls=available
+      ? '<div class="slot-actions"><button class="secondary" type="button" onclick="editSlot(\''+esc(x.slotId)+'\')">Edit</button><button class="danger" type="button" onclick="removeSlot(\''+esc(x.slotId)+'\')">Remove</button></div>'
+      : '<div class="meta small">This slot is locked because it has a '+(x.status==='PENDING'?'pending request':'confirmed appointment')+'. Manage it from the appointment tabs.</div>';
+    return '<article class="card"><div class="row" style="justify-content:space-between;align-items:center"><div class="name">'+esc(x.date)+'</div><span class="pill">'+esc(x.status)+'</span></div><div class="meta">'+esc(x.time)+'</div>'+controls+'</article>';
+  }).join('');
+}
+function saveSlot(){
+  const date=document.getElementById('slotDate').value;
+  const time=document.getElementById('slotTime').value;
+  const btn=document.getElementById('saveSlotBtn');
+  if(!date||!time){document.getElementById('slotFormMessage').textContent='Please select both a date and time.';return;}
+  btn.disabled=true;btn.textContent=editingSlotId?'Saving changes…':'Adding slot…';
+  document.getElementById('slotFormMessage').textContent='';
+  const success=r=>{
+    btn.disabled=false;
+    resetSlotForm();
+    loadSlots(r.message||'Slot saved successfully.');
+  };
+  const failure=e=>{
+    btn.disabled=false;
+    btn.textContent=editingSlotId?'Save changes':'Add available slot';
+    document.getElementById('slotFormMessage').textContent=e.message||String(e);
+  };
+  const runner=google.script.run.withSuccessHandler(success).withFailureHandler(failure);
+  if(editingSlotId)runner.adminUpdateSlot(sessionToken,editingSlotId,date,time);
+  else runner.adminAddSlot(sessionToken,date,time);
+}
+function editSlot(slotId){
+  const slot=slotsData.find(x=>String(x.slotId)===String(slotId));
+  if(!slot||slot.status!=='AVAILABLE')return;
+  editingSlotId=slot.slotId;
+  document.getElementById('slotDate').value=slot.date;
+  const m=String(slot.time).match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if(m){
+    let h=Number(m[1])%12;if(m[3].toUpperCase()==='PM')h+=12;
+    document.getElementById('slotTime').value=String(h).padStart(2,'0')+':'+m[2];
+  }else document.getElementById('slotTime').value=slot.time;
+  document.getElementById('slotFormTitle').textContent='Edit appointment slot';
+  document.getElementById('saveSlotBtn').textContent='Save changes';
+  document.getElementById('cancelEditBtn').classList.remove('hidden');
+  document.getElementById('slotFormMessage').textContent='Editing '+slot.date+' at '+slot.time+'.';
+  window.scrollTo(0,0);
+}
+function resetSlotForm(){
+  editingSlotId='';
+  document.getElementById('slotDate').value='';
+  document.getElementById('slotTime').value='';
+  document.getElementById('slotFormTitle').textContent='Add appointment slots';
+  document.getElementById('saveSlotBtn').textContent='Add available slot';
+  document.getElementById('saveSlotBtn').disabled=false;
+  document.getElementById('cancelEditBtn').classList.add('hidden');
+  document.getElementById('slotFormMessage').textContent='';
+}
+function removeSlot(slotId){
+  if(!confirm('Remove this available slot? Patients will no longer see it.'))return;
+  document.getElementById('notice').textContent='Removing slot…';
+  google.script.run.withSuccessHandler(r=>loadSlots(r.message||'Slot removed.'))
+    .withFailureHandler(e=>document.getElementById('notice').textContent=e.message||String(e))
+    .adminDeleteSlot(sessionToken,slotId);
 }
 function normalisePhone(value){
   let digits=String(value||'').replace(/\\D/g,'');
