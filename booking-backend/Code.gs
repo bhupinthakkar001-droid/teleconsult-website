@@ -739,6 +739,7 @@ function processAdminRequest_(requestId, approve) {
     const reqSheet = ss.getSheetByName(REQUESTS_SHEET);
     const slots = ss.getSheetByName(SLOTS_SHEET);
     if (!reqSheet || !slots) throw new Error('Booking sheets are missing.');
+    ensurePaymentColumns_(reqSheet);
     const values = reqSheet.getDataRange().getDisplayValues();
     let row = -1, req = null;
     for (let i=1; i<values.length; i++) {
