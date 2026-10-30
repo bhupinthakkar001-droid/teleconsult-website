@@ -46,10 +46,14 @@
       <div class="card" style="flex:1;margin:0"><div class="muted">Pending</div><div id="pendingCount" style="font-size:28px;font-weight:800">0</div></div>
       <div class="card" style="flex:1;margin:0"><div class="muted">Confirmed</div><div id="confirmedCount" style="font-size:28px;font-weight:800">0</div></div>
     </div>
-    <div class="tabs"><button id="pendingTab" class="active" onclick="showTab('pending')">Pending</button><button id="confirmedTab" onclick="showTab('confirmed')">Confirmed</button><button id="slotsTab" onclick="showTab('slots')">Manage slots</button></div>
+    <div class="tabs"><button id="pendingTab" class="active" onclick="showTab('pending')">Pending</button><button id="confirmedTab" onclick="showTab('confirmed')">Confirmed</button><button id="changesTab" onclick="showTab('changes')">Change requests</button><button id="slotsTab" onclick="showTab('slots')">Manage slots</button></div>
     <div id="notice" class="muted" style="margin:8px 2px"></div>
     <div id="requestList"></div>
     <button id="requestRefresh" class="secondary full" onclick="loadRequests()">Refresh appointments</button>
+    <section id="changePanel" class="hidden">
+      <div id="changeList"></div>
+      <button class="secondary full" type="button" onclick="loadChangeRequests()">Refresh change requests</button>
+    </section>
     <section id="slotPanel" class="hidden">
       <div class="card">
         <h2 id="slotFormTitle">Add appointment slots</h2>
@@ -70,7 +74,7 @@
   </section>
 </div>
 <script>
-let sessionToken='', currentTab='pending', data={pending:[],confirmed:[]}, slotsData=[], editingSlotId='';
+let sessionToken='', currentTab='pending', data={pending:[],confirmed:[]}, slotsData=[], editingSlotId='', changeRequests=[];
 function showError(id,msg){document.getElementById(id).textContent=msg||''}
 function login(){
   const btn=document.getElementById('loginBtn');btn.disabled=true;btn.textContent='Signing in…';showError('loginError','');
@@ -83,11 +87,13 @@ function showTab(tab){
   currentTab=tab;
   document.getElementById('pendingTab').classList.toggle('active',tab==='pending');
   document.getElementById('confirmedTab').classList.toggle('active',tab==='confirmed');
+  document.getElementById('changesTab').classList.toggle('active',tab==='changes');
   document.getElementById('slotsTab').classList.toggle('active',tab==='slots');
-  document.getElementById('requestList').classList.toggle('hidden',tab==='slots');
-  document.getElementById('requestRefresh').classList.toggle('hidden',tab==='slots');
+  document.getElementById('requestList').classList.toggle('hidden',tab==='slots'||tab==='changes');
+  document.getElementById('requestRefresh').classList.toggle('hidden',tab==='slots'||tab==='changes');
   document.getElementById('slotPanel').classList.toggle('hidden',tab!=='slots');
-  if(tab==='slots')loadSlots();else render();
+  document.getElementById('changePanel').classList.toggle('hidden',tab!=='changes');
+  if(tab==='slots')loadSlots();else if(tab==='changes')loadChangeRequests();else render();
 }
 function loadRequests(successNotice){
   document.getElementById('notice').textContent='Loading appointments…';
@@ -97,7 +103,7 @@ function loadRequests(successNotice){
 }
 function esc(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function render(){
-  if(currentTab==='slots')return;
+  if(currentTab==='slots'||currentTab==='changes')return;
   const items=data[currentTab]||[], root=document.getElementById('requestList');
   if(!items.length){root.innerHTML='<div class="card empty">No '+currentTab+' appointments.</div>';return;}
   root.innerHTML=items.map(x=>{
@@ -118,6 +124,42 @@ function render(){
     }
     return '<article class="card"><div class="row" style="justify-content:space-between;align-items:center"><div class="name">'+esc(x.patientName)+'</div><span class="pill">'+esc(x.status)+'</span></div><div class="meta">'+esc(x.date)+' · '+esc(x.time)+'</div><div class="meta">'+esc(x.visitType)+'</div><div class="meta">Mobile: '+esc(x.patientPhone)+'</div><div class="meta small">Request ID: '+esc(x.requestId)+'</div>'+actions+'</article>';
   }).join('');
+}
+function loadChangeRequests(){
+  document.getElementById('notice').textContent='Loading change requests…';
+  google.script.run.withSuccessHandler(r=>{
+    changeRequests=r.pending||[];
+    document.getElementById('notice').textContent=changeRequests.length+' pending change request(s).';
+    renderChangeRequests();
+  }).withFailureHandler(e=>{
+    document.getElementById('notice').textContent=e.message||String(e);
+    if((e.message||'').toLowerCase().includes('session expired'))logout();
+  }).adminGetChangeRequests(sessionToken);
+}
+function renderChangeRequests(){
+  const root=document.getElementById('changeList');
+  if(!changeRequests.length){root.innerHTML='<div class="card empty">No pending cancellation or rescheduling requests.</div>';return;}
+  root.innerHTML=changeRequests.map(x=>{
+    const reschedule=x.changeType==='RESCHEDULE';
+    const requested=reschedule?'<div class="meta"><strong>Requested new time:</strong> '+esc(x.newDate)+' · '+esc(x.newTime)+'</div>':'<div class="meta"><strong>Requested action:</strong> Cancel appointment</div>';
+    return '<article class="card"><div class="name">'+esc(x.patientName)+'</div>'+
+      '<div class="meta">Current booking ID: '+esc(x.requestId)+'</div>'+
+      '<div class="meta">Patient mobile: '+esc(x.patientPhone)+'</div>'+
+      '<div class="meta">Request type: '+(reschedule?'Reschedule':'Cancellation')+'</div>'+requested+
+      '<div class="row" style="margin-top:14px"><button class="primary" type="button" onclick="decideChange(\''+esc(x.changeId)+'\',true)">Approve request</button><button class="danger" type="button" onclick="decideChange(\''+esc(x.changeId)+'\',false)">Decline request</button></div></article>';
+  }).join('');
+}
+function decideChange(changeId,approve){
+  const action=approve?'approve this change request':'decline this change request';
+  if(!confirm('Are you sure you want to '+action+'?'))return;
+  document.getElementById('notice').textContent=approve?'Processing change request…':'Declining change request…';
+  google.script.run.withSuccessHandler(r=>{
+    loadRequests();
+    loadChangeRequests();
+    document.getElementById('notice').textContent=r.message||'Change request processed.';
+  }).withFailureHandler(e=>{
+    document.getElementById('notice').textContent=e.message||String(e);
+  }).adminDecideChangeRequest(sessionToken,changeId,approve);
 }
 function localDateString(){
   const d=new Date(),y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),day=String(d.getDate()).padStart(2,'0');
