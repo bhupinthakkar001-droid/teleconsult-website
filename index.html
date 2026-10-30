@@ -87,7 +87,7 @@ textarea{resize:vertical;min-height:76px;line-height:1.45}
   </div>
 </section>
 </main>
-<footer class="footer">For emergencies, please seek urgent local medical care.</footer>
+<footer class="footer">For emergencies, please seek urgent local medical care. · <a href="./privacy.html">Privacy Notice</a></footer>
 <div class="modal-wrap" id="modalWrap" role="presentation">
   <section class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
     <div class="modal-head"><div><h2 id="modalTitle">Book an appointment</h2><p>Tell us when you'd prefer to consult.</p></div><button class="close" id="closeBooking" type="button" aria-label="Close">×</button></div>
@@ -106,7 +106,8 @@ textarea{resize:vertical;min-height:76px;line-height:1.45}
       <div><label for="visitType">Appointment type</label><select id="visitType" name="visitType" required><option value="">Choose one</option><option>First consultation</option><option>Follow-up consultation</option></select></div>
       <div><label for="presentingComplaint">What problem are you consulting for, and for how long?</label><textarea id="presentingComplaint" name="presentingComplaint" rows="2" maxlength="1000" minlength="3" required placeholder="For example: fever for 3 days, headache for 1 week"></textarea></div>
       <div><label for="medicalHistory">Any existing diseases or past medical history? <span style="font-weight:500;color:var(--muted)">(Optional)</span></label><textarea id="medicalHistory" name="medicalHistory" rows="2" maxlength="1000" placeholder="For example: diabetes, high BP, asthma, heart or kidney disease"></textarea></div>
-      <div class="consent-row"><input id="onlineConsultConsent" name="onlineConsultConsent" type="checkbox" value="yes" required><label for="onlineConsultConsent">I consent to an online consultation and to sharing the details above with the doctor for my care.</label></div>
+      <div class="consent-row"><input id="onlineConsultConsent" name="onlineConsultConsent" type="checkbox" value="yes" required><label for="onlineConsultConsent">I request a video consultation. I understand that remote assessment may limit physical examination and that the doctor may recommend an in-person assessment when needed.</label></div>
+      <div class="consent-row"><input id="dataUseConsent" name="dataUseConsent" type="checkbox" value="yes" required><label for="dataUseConsent">I consent to Dr. Bhupin using my name, mobile number and health details submitted here for booking, consultation, follow-up and maintaining medical records. <a href="./privacy.html" target="_blank" rel="noopener">Read the Privacy Notice</a>.</label></div>
       <input name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px" value="">
       <button class="submit" id="submitBooking" type="submit">Request Appointment</button>
       <p class="fine">Your slot will be held as pending when you submit the form. The doctor must approve it before the appointment is confirmed.</p>
