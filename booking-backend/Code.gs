@@ -76,6 +76,14 @@ function setupBookingSystem() {
 function doGet(e) {
   const p = (e && e.parameter) || {};
   if (String(p.action || '') === 'admin') return HtmlService.createHtmlOutputFromFile('Admin').setTitle('Doctor Admin Dashboard');
+  if (String(p.action || '') === 'bookingOptions') {
+    const payload=JSON.stringify({ok:true,priorityEnabled:getPriorityBookingsEnabled_()});
+    const callback=String(p.callback||'');
+    if(callback && /^[A-Za-z_$][0-9A-Za-z_$]*$/.test(callback)) {
+      return ContentService.createTextOutput(callback+'('+payload+');').setMimeType(ContentService.MimeType.JAVASCRIPT);
+    }
+    return jsonOutput({ok:true,priorityEnabled:getPriorityBookingsEnabled_()});
+  }
   if (String(p.action || '') !== 'slots') {
     return jsonOutput({ ok: true, message: 'Teleconsult booking service is running.' });
   }
@@ -115,7 +123,10 @@ function doPost(e) {
   if (!['First consultation', 'Follow-up consultation'].includes(visitType)) return receiptPage_('Choose appointment type', 'Please choose first consultation or follow-up.', '');
   if (presentingComplaint.length < 3) return receiptPage_('Add your presenting problem', 'Please briefly describe what you are consulting about and how long you have had it.', '');
   if (!consentGiven) return receiptPage_('Consent required', 'Please confirm your consent to an online consultation before submitting.', '');
-  if (!['REGULAR','PRIORITY'].includes(serviceLevel)) return receiptPage_('Choose consultation option', 'Please choose regular or priority same-day consultation.', '');
+  if (!['REGULAR','PRIORITY'].includes(serviceLevel)) return receiptPage_('Choose consultation option', 'Please choose regular or priority consultation.', '');
+  if (serviceLevel === 'PRIORITY' && !getPriorityBookingsEnabled_()) {
+    return receiptPage_('Priority response option unavailable', 'Priority response bookings are temporarily unavailable. Please choose a regular consultation.', '');
+  }
   if (!/^\d{10,15}$/.test(doctorWhatsApp)) return receiptPage_('Booking setup incomplete', 'The doctor is still setting up WhatsApp confirmation. Please try again later.', '');
 
   const lock = LockService.getScriptLock();
@@ -148,15 +159,6 @@ function doPost(e) {
       return receiptPage_('That slot is no longer available', 'Another patient may have requested this time. Please return to the website and choose another slot.', '');
     }
 
-    if (serviceLevel === 'PRIORITY') {
-      if (String(chosen[1]).trim() !== todayString_()) {
-        return receiptPage_('Priority booking is same-day only', 'Please choose an available slot for today, or select regular consultation.', '');
-      }
-      if (parseAppointmentDateTime_(String(chosen[1]), String(chosen[2])).getTime() <= Date.now()) {
-        return receiptPage_('Choose a future time today', 'That same-day priority slot has already passed. Please choose another available time.', '');
-      }
-    }
-
     const requestId = Utilities.getUuid().slice(0, 8).toUpperCase();
     const now = Utilities.formatDate(new Date(), TIME_ZONE, 'yyyy-MM-dd HH:mm:ss');
     sheet.getRange(rowIndex, 4, 1, 5).setValues([[
@@ -169,7 +171,7 @@ function doPost(e) {
       safeCell_(name), safeCell_(phone), visitType, 'PENDING', now, '', '', '',
       safeCell_(presentingComplaint), safeCell_(medicalHistory), 'YES', now,
       serviceLevel, serviceLevel === 'PRIORITY' ? '2000' : '500',
-      serviceLevel === 'PRIORITY' ? '30 minutes' : 'Standard scheduling'
+      serviceLevel === 'PRIORITY' ? '30-minute response' : 'Standard scheduling'
     ]);
 
     const msg = [
@@ -179,16 +181,16 @@ function doPost(e) {
       'Preferred date: ' + chosen[1],
       'Preferred time: ' + chosen[2],
       'Appointment type: ' + visitType,
-      'Consultation option: ' + (serviceLevel === 'PRIORITY' ? 'PRIORITY SAME-DAY' : 'REGULAR'),
+      'Consultation option: ' + (serviceLevel === 'PRIORITY' ? 'PRIORITY RESPONSE' : 'REGULAR'),
       'Consultation fee: ₹' + (serviceLevel === 'PRIORITY' ? '2000' : '500'),
-      'Expected response: ' + (serviceLevel === 'PRIORITY' ? 'within 30 minutes, subject to doctor availability' : 'standard scheduling'),
+      'Expected response: ' + (serviceLevel === 'PRIORITY' ? 'within 30 minutes' : 'standard scheduling'),
       'Request ID: ' + requestId,
       '',
       'Please confirm or decline this request. I understand it is not confirmed until you approve it.'
     ].join('\n');
     const waUrl = 'https://wa.me/' + doctorWhatsApp + '?text=' + encodeURIComponent(msg);
     const receiptMessage = serviceLevel === 'PRIORITY'
-      ? 'Your priority same-day request has been received. The expected response target is within 30 minutes, subject to doctor availability. The fee is ₹2,000. Your slot is held as PENDING; the consultation is not confirmed until the doctor accepts it. This is not an emergency service.'
+      ? 'Your priority response request has been received. We will respond within 30 minutes. The fee is ₹2,000. Your selected slot is held as PENDING; the consultation is confirmed only after the doctor accepts it. This is not an emergency service.'
       : 'Your regular request has been received and your slot is held as PENDING. The fee is ₹500. Your appointment is not confirmed until the doctor approves it. Tap below and press Send in WhatsApp.';
     return receiptPage_('Request received', receiptMessage, waUrl, requestId);
   } catch (err) {
@@ -1024,4 +1026,22 @@ function reqsSetCancellation_(requests,row,req) {
 }
 function normalizeDigits_(value) {
   return normalizeWhatsAppPhone_(value);
+}
+
+
+/* ---------------- PRIORITY BOOKING AVAILABILITY CONTROL ---------------- */
+function getPriorityBookingsEnabled_() {
+  const value=PropertiesService.getScriptProperties().getProperty('PRIORITY_BOOKINGS_ENABLED');
+  return value === null ? true : value === 'true';
+}
+function adminGetPrioritySettings(token) {
+  requireAdminSession_(token);
+  return {priorityEnabled:getPriorityBookingsEnabled_()};
+}
+function adminSetPriorityBookingsEnabled(token, enabled) {
+  requireAdminSession_(token);
+  if (typeof enabled !== 'boolean') throw new Error('Invalid priority booking setting.');
+  PropertiesService.getScriptProperties().setProperty('PRIORITY_BOOKINGS_ENABLED',enabled?'true':'false');
+  return {ok:true,priorityEnabled:enabled,
+    message:enabled?'Priority response bookings are now visible to patients.':'Priority response bookings have been temporarily disabled.'};
 }
