@@ -1202,7 +1202,8 @@ function adminGetPatientRecord(token, patientId) {
       try{medicines=JSON.parse(r[11]||'[]');}catch(e){}
       prescriptions.push({
         prescriptionId:r[0],requestId:r[2],prescriptionDate:r[5],prescriptionTime:r[6],
-        assessment:r[7],medicines:medicines,advice:r[12],investigations:r[13],followup:r[14],createdAt:r[15]
+        assessment:r[7],medicines:medicines,advice:r[12],investigations:r[13],followup:r[14],createdAt:r[15],
+        pdfFileId:r[16]||'',pdfUrl:r[17]||''
       });
       if(prescriptions.length>=30)break;
     }
