@@ -1,39 +1,50 @@
-# Zero-cost teleconsult booking with automatic Google Meet links
+# Teleconsult booking + UPI payment setup
 
-The website displays only slots marked `AVAILABLE`. A patient request immediately changes the slot to `PENDING` and saves the request. When the doctor approves it, the script creates a unique Google Meet event/link in the doctor's Google Calendar, marks the booking confirmed, and prepares a WhatsApp message for the patient. No Daily API key or Daily payment method is needed.
+This system uses GitHub Pages for the patient website and Google Apps Script + a private Google Sheet for booking operations. UPI collection is a zero-gateway, manual-verification workflow. The website does **not** connect to a bank or verify credits automatically.
 
-Note: the call opens in Google Meet rather than being embedded inside the website. This is the simplest zero-budget route. The Daily embedded-video integration was removed because Daily was blocking calls until a payment method was added.
+## Update the Apps Script backend
 
-## One-time setup
+1. Open the latest [Code.gs](https://raw.githubusercontent.com/bhupinthakkar001-droid/teleconsult-website/main/booking-backend/Code.gs), copy the complete file, and paste it into the bound Apps Script project for the private **Teleconsult Bookings** Google Sheet, replacing the existing `Code.gs`.
+2. Open the latest [Admin.html](https://raw.githubusercontent.com/bhupinthakkar001-droid/teleconsult-website/main/booking-backend/Admin.html). In the same Apps Script project, open the existing HTML file named **Admin** and replace its contents. If it does not exist, add an HTML file named exactly `Admin`.
+3. Save both files.
+4. In the Apps Script editor, confirm the **Google Calendar API v3** service is enabled under Services. This is used to create unique Google Meet links.
+5. Run `setupBookingSystem` once. It preserves existing slots and requests and adds the payment columns to the Requests sheet.
+6. Deploy → Manage deployments → pencil icon → **New version** → Deploy. Keep the existing Web App `/exec` URL so the patient website remains connected.
+7. Open the doctor dashboard using the existing Web App URL with `?action=admin`, then sign in.
 
-1. Open [the latest Code.gs](https://raw.githubusercontent.com/bhupinthakkar001-droid/teleconsult-website/main/booking-backend/Code.gs).
-2. Copy all the code.
-3. Open the private **Teleconsult Bookings** Google Sheet → **Extensions → Apps Script**.
-4. Open `Code.gs`, select all, paste the copied code, and press **Ctrl + S**.
-5. In the left sidebar, find **Services** and click the **+**. Select **Google Calendar API**, version **v3**, then click **Add**. This enables the Calendar service used to create unique Meet links.
-6. In the Apps Script function dropdown, run `configureTeleconsultation` if you need to set or change your WhatsApp number. Enter country code + number, digits only. If your number was already saved in Script Properties from the previous setup, it remains there.
-7. Select `setupBookingSystem` and click **Run** once. It updates the Requests link header while preserving existing request rows and slots.
-8. Click **Deploy → Manage deployments → pencil icon → New version → Deploy**. Keep the existing `/exec` URL.
-9. If Google asks for additional permission to manage calendar events, review it and approve only if you recognize this script and the action you initiated.
-10. Refresh the website using **Ctrl + Shift + R**.
+## Configure the UPI details
 
-You do not need a Daily account or Daily API key for this version. Do not add a payment method to Daily just for this workflow.
+1. In the doctor dashboard, open **Payment setup**.
+2. Enter the UPI ID where consultation fees should be received, for example `name@bank`.
+3. Enter the payee name exactly as patients should see it.
+4. Optionally enter an HTTPS image URL for your UPI QR code. You can leave this blank; the patient page will still show the UPI ID, a copy button and an **Open UPI app to pay** link with the correct amount pre-filled.
+5. Press **Save payment details**. The UPI ID and payee name are public payment instructions; never enter a UPI PIN, OTP, bank password or card details.
 
-## How the booking works
+The patient website is updated through GitHub Pages. Refresh it after configuring payment details.
 
-1. Add appointments to the **Slots** tab with a unique ID, date as `YYYY-MM-DD`, time such as `10:00 AM`, and status `AVAILABLE`.
-2. Patients see only currently available slots. A submitted request is stored as `PENDING`, and the slot is hidden from the public calendar.
-3. To approve, open **Requests**, select the pending row, and choose **Teleconsult bookings → Approve request & create Google Meet**.
-4. The script creates a unique Google Calendar event with a new Meet conference link. The appointment is marked confirmed, and the Meet URL is saved in the Requests tab's `videoLink` column.
-5. The confirmation dialog offers **Join Google Meet as doctor**, **Send via WhatsApp**, and **Send via SMS / Messages**. If the patient isn't on WhatsApp, use SMS / Messages. On computers without a messaging app, copy the confirmation message and send it from your phone. Messages are not sent automatically.
-6. To decline, select the pending request and choose **Teleconsult bookings → Decline selected request**. The slot becomes `AVAILABLE` again.
+## Patient payment flow
 
-The appointment appears on the doctor's primary Google Calendar. The script creates a 30-minute event starting at the selected appointment time. Check your Google Calendar time zone before using it with real patients.
+1. The patient chooses Regular (₹500) or Priority (₹2,000), a date and time, and completes the intake form and required consents.
+2. The patient pays the exact amount using the displayed UPI ID, QR image (if configured), or UPI app link.
+3. The patient enters the UPI transaction reference / UTR and checks the payment declaration before submitting.
+4. The request is held as **PENDING**. The submitted UPI reference is stored in the Requests sheet with the server-calculated fee. Submission of a reference is not proof that funds arrived.
 
-## Privacy and test checklist
+## Verify a payment and confirm an appointment
 
-- Keep the Google Sheet private; it contains patient names and mobile numbers.
-- Send the Meet link only to the patient whose appointment was confirmed. If they aren't on WhatsApp, use normal SMS or call them; SMS charges depend on your phone plan.
-- Use a unique Meet conference per appointment; do not reuse meeting links.
-- Test with dummy details before taking real consultations.
-- This approach does not embed the actual Google Meet UI into your page; it opens the Google Meet call in a new tab.
+1. Sign in to the doctor dashboard and open **Pending**.
+2. Compare the patient's transaction reference and exact amount with the actual credit in your bank or UPI app. Do not rely only on the screenshot or reference entered by the patient.
+3. Once you have independently confirmed the credit, press **Verify payment**.
+4. The **Approve & create Meet** button becomes available. Approve the request to create a unique Google Meet link and confirm the slot.
+5. Send the confirmation and Meet link to the patient using the dashboard's WhatsApp/SMS actions.
+
+If the payment cannot be confirmed, do not verify or approve the appointment. Decline the booking and handle any refund manually through your bank/UPI app. Cancellations and refunds are not automated by this system.
+
+## Important operational notes
+
+- Payment references are stored in the private Requests sheet. Keep the Google Sheet private.
+- A UPI ID and QR image may be visible to any website visitor; use only the account you intend to receive consultation payments into.
+- The doctor must manually verify every credit. This implementation does not integrate with Razorpay, Cashfree, Paytm, a bank API or an automatic payment webhook.
+- Never ask patients to share a UPI PIN, OTP, card number or banking password.
+- The appointment remains unconfirmed until payment is verified and the doctor approves it.
+- Keep the Privacy Notice aligned with the information collected by the form.
+- The Google Meet call opens in a new tab; it is not embedded in the website.
