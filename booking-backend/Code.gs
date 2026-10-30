@@ -1245,15 +1245,21 @@ function consumePrescriptionHandoff_(handoffToken) {
   if (!/^[A-Fa-f0-9]{64}$/.test(String(handoffToken || ''))) {
     return {ok:false,error:'This prescription handoff link is invalid or has expired. Return to the doctor dashboard and try again.'};
   }
-  const cache = CacheService.getScriptCache();
-  const key = 'RX_HANDOFF_' + handoffToken;
-  const raw = cache.get(key);
-  if (!raw) return {ok:false,error:'This one-time prescription handoff has expired or was already used. Return to the doctor dashboard and create a new one.'};
-  cache.remove(key);
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
   try {
-    return {ok:true,payload:JSON.parse(raw)};
-  } catch (err) {
-    return {ok:false,error:'The prescription handoff could not be read. Please create a new one.'};
+    const cache = CacheService.getScriptCache();
+    const key = 'RX_HANDOFF_' + handoffToken;
+    const raw = cache.get(key);
+    if (!raw) return {ok:false,error:'This one-time prescription handoff has expired or was already used. Return to the doctor dashboard and create a new one.'};
+    cache.remove(key);
+    try {
+      return {ok:true,payload:JSON.parse(raw)};
+    } catch (err) {
+      return {ok:false,error:'The prescription handoff could not be read. Please create a new one.'};
+    }
+  } finally {
+    lock.releaseLock();
   }
 }
 
