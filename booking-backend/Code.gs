@@ -1164,12 +1164,14 @@ function adminSearchPatients(token, query) {
   requireAdminSession_(token);
   const sheets = ensureEmrSheets_();
   const q = String(query||'').trim().toLowerCase();
+  const qDigits = emrPhoneKey_(q);
   const rows = sheets.patients.getLastRow() < 2 ? [] :
     sheets.patients.getRange(2,1,sheets.patients.getLastRow()-1,EMR_PATIENT_HEADERS.length).getDisplayValues();
   const results = [];
   for (let i=rows.length-1;i>=0;i--) {
     const patient = emrPatientFromRow_(rows[i]);
-    if (!q || patient.patientName.toLowerCase().includes(q) || emrPhoneKey_(patient.phone).includes(emrPhoneKey_(q)) || patient.patientId.toLowerCase().includes(q)) {
+    const phoneMatch = qDigits.length >= 3 && emrPhoneKey_(patient.phone).includes(qDigits);
+    if (!q || patient.patientName.toLowerCase().includes(q) || phoneMatch || patient.patientId.toLowerCase().includes(q)) {
       results.push({patientId:patient.patientId,patientName:patient.patientName,phone:patient.phone,allergies:patient.allergies,chronicConditions:patient.chronicConditions,updatedAt:patient.updatedAt});
       if (results.length >= 40) break;
     }
