@@ -388,10 +388,10 @@ function renderFollowUps(){
     const label=isOverdue?'OVERDUE':(isToday?'DUE TODAY':'UPCOMING');
     const parts=String(item.dueDate||'').split('-').map(Number);
     const dateText=parts.length===3?new Date(parts[0],parts[1]-1,parts[2]).toLocaleDateString('en-IN'):(item.dueDate||'Date not set');
-    const digits=String(item.phone||'').replace(/\\D/g,'');
+    const digits=String(item.phone||'').replace(/\D/g,'');
     const waPhone=digits.length===10?'91'+digits:digits;
     const message='Hello '+item.patientName+', this is a follow-up reminder from Dr. Bhupin Thakkar’s online consultation service. Your follow-up is due on '+dateText+'. Please reply here or use the online booking page to arrange your review: https://bhupinthakkar001-droid.github.io/teleconsult-website/.';
-    const wa= /^\\d{10,15}$/.test(waPhone)?'https://wa.me/'+waPhone+'?text='+encodeURIComponent(message):'';
+    const wa= /^\d{10,15}$/.test(waPhone)?'https://wa.me/'+waPhone+'?text='+encodeURIComponent(message):'';
     return '<article class="followup-item"><div class="followup-top"><div><strong>'+esc(item.patientName)+'</strong><div class="followup-meta">'+esc(item.phone)+' · '+esc(item.reason||'Follow-up review')+'</div></div><span class="followup-status '+state+'">'+label+'</span></div>'+
       '<div class="followup-meta">Due: '+esc(dateText)+' · Patient ID: '+esc(item.patientId)+'</div>'+
       '<div class="followup-actions">'+(wa?'<a class="action whatsapp" href="'+esc(wa)+'" target="_blank" rel="noopener">WhatsApp reminder</a>':'')+
@@ -656,7 +656,7 @@ function removeSlot(slotId){
     .adminDeleteSlot(sessionToken,slotId);
 }
 function normalisePhone(value){
-  let digits=String(value||'').replace(/\\D/g,'');
+  let digits=String(value||'').replace(/\D/g,'');
   if(digits.length===10)digits='91'+digits;
   else if(digits.length===11 && digits.charAt(0)==='0')digits='91'+digits.slice(1);
   return digits;
