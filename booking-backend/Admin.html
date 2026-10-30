@@ -28,6 +28,11 @@
     .slot-form-actions button{flex:1}
     .slot-actions{display:flex;gap:8px;margin-top:12px}
     .slot-actions button{flex:1}
+    .intake-details{margin:12px 0;padding:11px 12px;border:1px solid var(--line);border-radius:12px;background:#f8faf8}
+    .intake-details summary{font-size:13px;font-weight:750;color:var(--green);cursor:pointer}
+    .intake-body{display:grid;gap:9px;margin-top:12px;font-size:13px}
+    .intake-body strong{display:block;font-size:12px;color:var(--muted);margin-bottom:3px}
+    .intake-body p{white-space:pre-wrap;margin:0;color:var(--ink);overflow-wrap:anywhere}
     @media(max-width:420px){.slot-grid{grid-template-columns:1fr}.slot-form-actions{flex-direction:column}}
   </style>
 </head>
@@ -123,7 +128,12 @@ function render(){
     } else {
       actions='<div class="row" style="margin-top:14px"><button class="primary" onclick="decide(\''+esc(x.requestId)+'\',true)">Approve & create Meet</button><button class="danger" onclick="decide(\''+esc(x.requestId)+'\',false)">Decline</button></div>';
     }
-    return '<article class="card"><div class="row" style="justify-content:space-between;align-items:center"><div class="name">'+esc(x.patientName)+'</div><span class="pill">'+esc(x.status)+'</span></div><div class="meta">'+esc(x.date)+' · '+esc(x.time)+'</div><div class="meta">'+esc(x.visitType)+'</div><div class="meta">Mobile: '+esc(x.patientPhone)+'</div><div class="meta small">Request ID: '+esc(x.requestId)+'</div>'+actions+'</article>';
+    const intake='<details class="intake-details"><summary>Patient intake details</summary><div class="intake-body">'+
+      '<div><strong>Presenting complaint & duration</strong><p>'+esc(x.presentingComplaint||'Not recorded for this booking.')+'</p></div>'+
+      '<div><strong>Existing diseases / past medical history</strong><p>'+esc(x.medicalHistory||'Not provided')+'</p></div>'+
+      '<div><strong>Online consultation consent</strong><p>'+(x.onlineConsultConsent==='YES'?'Given':'Not recorded for this booking')+'</p></div>'+
+      '</div></details>';
+    return '<article class="card"><div class="row" style="justify-content:space-between;align-items:center"><div class="name">'+esc(x.patientName)+'</div><span class="pill">'+esc(x.status)+'</span></div><div class="meta">'+esc(x.date)+' · '+esc(x.time)+'</div><div class="meta">'+esc(x.visitType)+'</div><div class="meta">Mobile: '+esc(x.patientPhone)+'</div><div class="meta small">Request ID: '+esc(x.requestId)+'</div>'+intake+actions+'</article>';
   }).join('');
 }
 function loadChangeRequests(){
