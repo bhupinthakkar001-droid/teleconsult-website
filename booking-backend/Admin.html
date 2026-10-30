@@ -45,6 +45,22 @@
     .consult-generator{background:#f8faf8;border:1px solid var(--line);padding:14px;border-radius:14px;margin:14px 0}
     .consult-generator .row{margin-top:10px}
     .consult-status{font-size:13px;color:var(--green);margin:8px 0}
+    .consult-mobile-help{font-size:12px;line-height:1.5;color:var(--muted);background:#f5f8f5;border:1px solid var(--line);padding:11px 12px;border-radius:12px;margin:10px 0}
+    .consult-mobile-actions{position:sticky;bottom:0;z-index:4;background:rgba(255,255,255,.97);backdrop-filter:blur(8px);padding:10px 0 calc(10px + env(safe-area-inset-bottom));border-top:1px solid var(--line);box-shadow:0 -5px 16px #19362d0c}
+    .consult-mobile-actions button{min-height:46px}
+    .consult-generator .row{align-items:stretch}
+    @media(max-width:600px){
+      .wrap{padding:10px 9px calc(28px + env(safe-area-inset-bottom))}
+      .consult-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:0 8px}
+      .consult-field.full{grid-column:1/-1}
+      .consult-field input,.consult-field textarea,.consult-field select{font-size:16px;padding:10px 9px}
+      .consult-field textarea{min-height:74px}
+      .consult-mobile-actions{margin:12px -9px 0;padding:10px 9px calc(10px + env(safe-area-inset-bottom));}
+      .consult-mobile-actions button{padding:11px 8px;font-size:12px;min-width:0}
+      .consult-generator .row{flex-direction:column}
+      .consult-generator .row>*{width:100%;flex:none}
+    }
+    @media(max-width:360px){.consult-grid{grid-template-columns:1fr}.consult-field.full{grid-column:auto}.consult-mobile-actions{flex-direction:column}}
     @media(max-width:520px){.consult-grid{grid-template-columns:1fr}.consult-field.full{grid-column:auto}}
     @media(max-width:420px){.slot-grid{grid-template-columns:1fr}.slot-form-actions{flex-direction:column}}
   </style>
@@ -105,6 +121,11 @@
         <div id="consultationPatientSummary" class="consult-summary"></div>
         <div id="consultationMeetAction" class="row" style="margin:8px 0 12px"></div>
         <div id="consultationNotice" class="consult-status">Loading consultation record…</div>
+        <details class="consult-mobile-help">
+          <summary><strong>Using this workspace on your phone</strong></summary>
+          <p><strong>Android:</strong> Open Meet from the button above. Then open Recent apps, tap the Meet app icon and choose Split screen (wording varies by phone). Select Chrome for the other half. Turn the phone sideways for more room. On Pixel phones, Google documents the Recent apps → app icon → Split screen steps.</p>
+          <p><strong>Most standard iPhones:</strong> Keep Meet and notes in separate apps and switch between them; normal iPhones do not provide Android-style two-app split screen. iPhone Duo has a dedicated Split View feature.</p>
+        </details>
         <div class="consult-grid">
           <div class="consult-field"><label for="consultAge">Age</label><input id="consultAge" type="number" min="0" max="120" inputmode="numeric" placeholder="Age in years"></div>
           <div class="consult-field"><label for="consultSex">Sex</label><select id="consultSex"><option value="">Not recorded</option><option>Female</option><option>Male</option><option>Other</option></select></div>
@@ -125,7 +146,7 @@
           <div class="consult-field full"><label for="consultFollowup">Follow-up advice</label><textarea id="consultFollowup" placeholder="When to follow up and when in-person / emergency evaluation is needed"></textarea></div>
           <div class="consult-field"><label for="consultFollowupDate">Follow-up date (optional)</label><input id="consultFollowupDate" type="date"></div>
         </div>
-        <div class="row" style="margin-top:10px">
+        <div class="row consult-mobile-actions" style="margin-top:10px">
           <button class="secondary" id="saveConsultationBtn" type="button" onclick="saveConsultation('DRAFT')">Save draft</button>
           <button class="primary" id="completeConsultationBtn" type="button" onclick="saveConsultation('COMPLETED')">Mark consultation completed</button>
         </div>
