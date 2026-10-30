@@ -108,13 +108,6 @@ function render(){
   const items=data[currentTab]||[], root=document.getElementById('requestList');
   if(!items.length){root.innerHTML='<div class="card empty">No '+currentTab+' appointments.</div>';return;}
   root.innerHTML=items.map(x=>{
-    let paymentInfo='';
-    if(x.paymentReference){
-      paymentInfo='<div class="meta">UPI reference: <strong>'+esc(x.paymentReference)+'</strong></div>'+
-        '<div class="meta">Payment: <strong>'+(x.paymentStatus==='VERIFIED'?'VERIFIED':esc(x.paymentStatus||'SUBMITTED'))+'</strong></div>';
-    }else if(currentTab==='pending'){
-      paymentInfo='<div class="meta">Payment reference: Not recorded (older booking)</div>';
-    }
     let actions='';
     if(currentTab==='confirmed' && x.videoLink){
       const phone=normalisePhone(x.patientPhone);
@@ -128,26 +121,11 @@ function render(){
     } else if(currentTab==='confirmed') {
       actions='<p class="meta">Meet link is not available for this appointment. Please check the Requests sheet.</p>';
     } else {
-      const needsVerification=!!x.paymentReference && x.paymentStatus!=='VERIFIED';
-      const verifyButton=x.paymentReference && x.paymentStatus!=='VERIFIED'
-        ? '<button class="secondary" type="button" onclick="verifyPayment(\''+esc(x.requestId)+'\')">Mark ₹500 payment verified</button>'
-        : '';
-      const approveButton='<button class="primary" type="button" '+(needsVerification?'disabled title="Verify payment before approving"':'')+' onclick="decide(\''+esc(x.requestId)+'\',true)">Approve & create Meet</button>';
-      actions='<div class="row" style="margin-top:14px">'+verifyButton+approveButton+'<button class="danger" onclick="decide(\''+esc(x.requestId)+'\',false)">Decline</button></div>';
+      actions='<div class="row" style="margin-top:14px"><button class="primary" onclick="decide(\''+esc(x.requestId)+'\',true)">Approve & create Meet</button><button class="danger" onclick="decide(\''+esc(x.requestId)+'\',false)">Decline</button></div>';
     }
-    return '<article class="card"><div class="row" style="justify-content:space-between;align-items:center"><div class="name">'+esc(x.patientName)+'</div><span class="pill">'+esc(x.status)+'</span></div><div class="meta">'+esc(x.date)+' · '+esc(x.time)+'</div><div class="meta">'+esc(x.visitType)+'</div><div class="meta">Mobile: '+esc(x.patientPhone)+'</div><div class="meta small">Request ID: '+esc(x.requestId)+'</div>'+paymentInfo+actions+'</article>';
+    return '<article class="card"><div class="row" style="justify-content:space-between;align-items:center"><div class="name">'+esc(x.patientName)+'</div><span class="pill">'+esc(x.status)+'</span></div><div class="meta">'+esc(x.date)+' · '+esc(x.time)+'</div><div class="meta">'+esc(x.visitType)+'</div><div class="meta">Mobile: '+esc(x.patientPhone)+'</div><div class="meta small">Request ID: '+esc(x.requestId)+'</div>'+actions+'</article>';
   }).join('');
 }
-function verifyPayment(requestId){
-  if(!confirm('Have you checked your bank or UPI app and confirmed receipt of ₹500 for this UPI reference?'))return;
-  document.getElementById('notice').textContent='Verifying payment…';
-  google.script.run.withSuccessHandler(r=>{
-    loadRequests(r.message||'Payment verified.');
-  }).withFailureHandler(e=>{
-    document.getElementById('notice').textContent=e.message||String(e);
-  }).adminVerifyPayment(sessionToken,requestId);
-}
-
 function loadChangeRequests(){
   document.getElementById('notice').textContent='Loading change requests…';
   google.script.run.withSuccessHandler(r=>{
