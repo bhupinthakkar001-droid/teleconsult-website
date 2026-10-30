@@ -345,7 +345,7 @@ function render(){
       const approvalButton=paymentStatus==='VERIFIED'
         ? '<button class="primary" type="button" onclick="decide(\''+esc(x.requestId)+'\',true)">'+approveText+'</button>'
         : '<button class="primary" type="button" disabled title="Verify the UPI transaction first">Verify payment before approval</button>';
-      actions=paymentInfo+'<div class="muted small">Compare the UPI reference and exact fee against your bank/UPI transaction history before verifying. The system does not check bank payments automatically.</div><div class="row" style="margin-top:14px">'+verifyButton+approvalButton+'<button class="danger" type="button" onclick="decide(\''+esc(x.requestId)+'\',false)">Decline</button></div>';
+      actions='<div class="muted small">Compare the UPI reference and exact fee against your bank/UPI transaction history before verifying. The system does not check bank payments automatically.</div><div class="row" style="margin-top:14px">'+verifyButton+approvalButton+'<button class="danger" type="button" onclick="decide(\''+esc(x.requestId)+'\',false)">Decline</button></div>';
     }
     const intake='<details class="intake-details"><summary>Patient intake details</summary><div class="intake-body">'+
       '<div><strong>Presenting complaint & duration</strong><p>'+esc(x.presentingComplaint||'Not recorded for this booking.')+'</p></div>'+
