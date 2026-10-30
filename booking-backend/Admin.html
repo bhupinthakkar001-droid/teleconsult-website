@@ -179,7 +179,7 @@ function render(){
     const isPriority=x.serviceLevel==='PRIORITY';
     const cardClass=isPriority?'card priority-card':'card';
     const service='<div class="row" style="align-items:center;gap:8px;margin:6px 0">'+
-      (isPriority?'<span class="priority-label">PRIORITY SAME-DAY</span>':'')+
+      (isPriority?'<span class="priority-label">PRIORITY RESPONSE</span>':'')+
       '<span class="meta">Fee: ₹'+esc(x.consultationFee|| (isPriority?'2000':'500'))+'</span></div>'+
       (isPriority?'<div class="priority-meta">'+esc(priorityDeadlineText(x.requestedAt))+' · Subject to doctor availability</div>':'');
     let actions='';
@@ -344,7 +344,7 @@ function normalisePhone(value){
 function confirmationMessage(x){
   const priority=x.serviceLevel==='PRIORITY';
   const fee=x.consultationFee||(priority?'2000':'500');
-  return 'Hello '+(x.patientName||'')+', your '+(priority?'priority same-day ':'')+'video consultation with Dr. Bhupin is confirmed. Date: '+x.date+'. Time: '+x.time+'. Appointment: '+(x.visitType||'Video consultation')+'. Consultation fee: ₹'+fee+'. Join using this Google Meet link: '+x.videoLink+'. Please open the link at the appointment time.';
+  return 'Hello '+(x.patientName||'')+', your '+(priority?'priority response ':'')+'video consultation with Dr. Bhupin is confirmed. Date: '+x.date+'. Time: '+x.time+'. Appointment: '+(x.visitType||'Video consultation')+'. Consultation fee: ₹'+fee+'. Join using this Google Meet link: '+x.videoLink+'. Please open the link at the appointment time.';
 }
 function copySms(requestId){
   const x=(data.confirmed||[]).find(item=>String(item.requestId)===String(requestId));
