@@ -648,7 +648,7 @@ function adminGetSlots(token) {
   rows.forEach(function(r) {
     const date = String(r[1] || '').trim();
     const status = String(r[3] || '').trim().toUpperCase();
-    if (r[0] && date >= today && ['AVAILABLE','PENDING','CONFIRMED'].includes(status)) {
+    if (r[0] && date >= today && ['AVAILABLE','PENDING','CONFIRMED','CHANGE_PENDING'].includes(status)) {
       result.push({slotId:String(r[0]), date:date, time:String(r[2] || ''), status:status});
     }
   });
@@ -748,7 +748,7 @@ function ensureNoDuplicateSlot_(sheet, date, minutes, exceptSlotId) {
     const rowDate = String(rows[i][1] || '').trim();
     const status = String(rows[i][3] || '').trim().toUpperCase();
     if (id && id !== exceptSlotId && rowDate === date &&
-        ['AVAILABLE','PENDING','CONFIRMED'].includes(status) &&
+        ['AVAILABLE','PENDING','CONFIRMED','CHANGE_PENDING'].includes(status) &&
         toMinutes_(rows[i][2]) === minutes) {
       throw new Error('A slot already exists at this date and time.');
     }
