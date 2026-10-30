@@ -34,6 +34,15 @@ body{background:var(--bg);min-height:100svh;display:flex;flex-direction:column}
 .manage-help{font-size:12px;line-height:1.45;color:var(--muted);margin:0}
 .manage-section{display:none}
 .manage-section.show{display:block}
+.payment-card{border:1px solid var(--line);border-radius:14px;background:#f8faf8;padding:14px;display:grid;gap:10px}
+.payment-top{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.payment-amount{font-size:22px;font-weight:850;color:var(--green)}
+.payment-detail{font-size:12px;color:var(--muted);line-height:1.4}
+.payment-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.pay-button,.copy-upi{display:flex;align-items:center;justify-content:center;min-height:44px;border-radius:11px;padding:10px;text-decoration:none;font:700 13px inherit;text-align:center;border:0;cursor:pointer}
+.pay-button{background:var(--green);color:#fff}
+.copy-upi{background:#e6efe8;color:var(--green)}
+.payment-error{font-size:12px;color:#a33b31}
 .footer{padding:0 4% 18px;text-align:center;font-size:11px;color:#8a9790}
 .modal-wrap{position:fixed;inset:0;display:none;place-items:center;padding:16px;background:rgba(13,32,24,.48);backdrop-filter:blur(5px);z-index:10}
 .modal-wrap.open{display:grid}
@@ -94,6 +103,17 @@ form{display:grid;gap:13px}.fields{display:grid;grid-template-columns:1fr 1fr;ga
         <div><label for="time">Available time</label><select id="time" name="time" required disabled><option value="">Choose date first</option></select></div>
       </div>
       <div><label for="visitType">Appointment type</label><select id="visitType" name="visitType" required><option value="">Choose one</option><option>First consultation</option><option>Follow-up consultation</option></select></div>
+      <div class="payment-card">
+        <div class="payment-top"><strong>Consultation fee</strong><span class="payment-amount" id="feeText">₹500</span></div>
+        <div class="payment-detail" id="paymentInfo">Loading UPI payment details…</div>
+        <div class="payment-actions">
+          <a class="pay-button" id="upiPayLink" href="#" style="display:none">Pay ₹500 via UPI</a>
+          <button class="copy-upi" id="copyUpiBtn" type="button" disabled>Copy UPI ID</button>
+        </div>
+        <div><label for="paymentReference">UPI transaction reference / UTR</label><input id="paymentReference" name="paymentReference" required minlength="6" maxlength="50" pattern="[A-Za-z0-9-]{6,50}" autocomplete="off" placeholder="Enter reference after payment"></div>
+        <p class="fine">Pay ₹500 first, then enter the UPI transaction reference from your payment app. Your booking remains pending until the doctor checks the payment and approves it. Do not submit a false reference.</p>
+        <div class="payment-error" id="paymentError"></div>
+      </div>
       <input name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px" value="">
       <button class="submit" id="submitBooking" type="submit">Request Appointment</button>
       <p class="fine">Your slot will be held as pending when you submit the form. The doctor must approve it before the appointment is confirmed.</p>
@@ -140,7 +160,10 @@ const dateSelect=document.getElementById('date');
 const timeSelect=document.getElementById('time');
 const slotInput=document.getElementById('slotId');
 const submitButton=document.getElementById('submitBooking');
-let availableSlots=[];
+const paymentInfo=document.getElementById('paymentInfo');
+const upiPayLink=document.getElementById('upiPayLink');
+const copyUpiBtn=document.getElementById('copyUpiBtn');
+let availableSlots=[], paymentConfig=null, slotsReady=false, paymentReady=false;
 function showNotice(message){notice.textContent=message;notice.classList.add('show')}
 function openModal(){modal.classList.add('open');document.body.style.overflow='hidden';setTimeout(()=>document.getElementById('patientName').focus(),30)}
 function closeModal(){modal.classList.remove('open');document.body.style.overflow='';notice.classList.remove('show')}
@@ -187,6 +210,34 @@ function displayDate(iso){
   const d=new Date(parts[0],parts[1]-1,parts[2]);
   return new Intl.DateTimeFormat('en-IN',{weekday:'short',day:'numeric',month:'short',year:'numeric'}).format(d);
 }
+function loadPaymentConfig(){
+  if(!apiReady){paymentInfo.textContent='The payment service is not connected. Please contact the doctor.';return;}
+  window.receiveTeleconsultPaymentConfig=function(payload){
+    paymentConfig=payload||null;
+    if(!payload||!payload.ok||!payload.upiId){
+      paymentReady=false;
+      paymentInfo.textContent=(payload&&payload.message)||'Doctor UPI details are not configured yet. Please contact the doctor.';
+      document.getElementById('paymentError').textContent='Online booking payment is not available yet.';
+      upiPayLink.style.display='none';
+      copyUpiBtn.disabled=true;
+      submitButton.disabled=true;
+      return;
+    }
+    paymentReady=true;
+    document.getElementById('feeText').textContent='₹'+Number(payload.fee||500);
+    paymentInfo.textContent='Pay to '+(payload.payeeName||'Dr. Bhupin Thakkar')+' using the UPI ID shown below: '+payload.upiId;
+    const params=new URLSearchParams({pa:payload.upiId,pn:payload.payeeName||'Dr. Bhupin Thakkar',am:String(payload.fee||500),cu:'INR',tn:'Teleconsult Dr Bhupin'});
+    upiPayLink.href='upi://pay?'+params.toString();
+    upiPayLink.style.display='flex';
+    copyUpiBtn.disabled=false;
+    document.getElementById('paymentError').textContent='';
+    submitButton.disabled=!slotsReady;
+  };
+  const script=document.createElement('script');
+  script.src=BOOKING_API_URL+'?action=payment&callback=receiveTeleconsultPaymentConfig&_='+Date.now();
+  script.onerror=()=>{paymentReady=false;paymentInfo.textContent='Unable to load UPI details. Please refresh or contact the doctor.';submitButton.disabled=true;};
+  document.head.appendChild(script);
+}
 function loadSlots(){
   if(!apiReady){
     setNoSlots('The booking calendar is not connected yet. Please contact the doctor directly.');
@@ -208,7 +259,8 @@ function loadSlots(){
     if(!dates.length){setNoSlots('No appointment slots are currently available. Please check again later.');return;}
     timeSelect.disabled=true;
     timeSelect.innerHTML='<option value="">Choose a date first</option>';
-    submitButton.disabled=false;
+    slotsReady=true;
+    submitButton.disabled=!(slotsReady&&paymentReady);
     notice.classList.remove('show');
   };
   const script=document.createElement('script');
@@ -219,6 +271,7 @@ function loadSlots(){
 function setNoSlots(message){
   dateSelect.innerHTML='<option value="">No slots available</option>';
   timeSelect.innerHTML='<option value="">No available times</option>';
+  slotsReady=false;
   dateSelect.disabled=true;timeSelect.disabled=true;submitButton.disabled=true;
   showNotice(message);
 }
@@ -236,23 +289,37 @@ function updateTimes(){
 }
 dateSelect.addEventListener('change',updateTimes);
 timeSelect.addEventListener('change',()=>{slotInput.value=timeSelect.value});
+copyUpiBtn.addEventListener('click',()=>{
+  if(!paymentConfig||!paymentConfig.upiId)return;
+  const vpa=paymentConfig.upiId;
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(vpa).then(()=>{copyUpiBtn.textContent='UPI ID copied';}).catch(()=>{window.prompt('Copy this UPI ID',vpa);});
+  }else window.prompt('Copy this UPI ID',vpa);
+});
 form.addEventListener('submit',e=>{
   e.preventDefault();
   notice.classList.remove('show');
   if(!form.reportValidity()) return;
+  if(!paymentReady){showNotice('UPI payment details are not configured yet. Please contact the doctor.');return;}
   if(!slotInput.value){
     showNotice('Please select an available date and time.');return;
+  }
+  const paymentRef=document.getElementById('paymentReference').value.trim();
+  if(!/^[A-Za-z0-9-]{6,50}$/.test(paymentRef)){
+    document.getElementById('paymentReference').focus();
+    showNotice('Enter the UPI transaction reference / UTR after paying ₹500.');return;
   }
   const chosen=availableSlots.find(s=>s.slotId===slotInput.value&&s.date===dateSelect.value);
   if(!chosen){
     showNotice('That slot is no longer available. Please refresh and select another time.');return;
   }
-  showNotice('Your request is being submitted in a new tab. Follow the instructions there to continue to WhatsApp. The slot will be held as pending if the request is accepted.');
+  showNotice('Your ₹500 payment reference is being submitted with your booking. The slot will be held as pending while the doctor verifies the payment.');
   submitButton.disabled=true;
   submitButton.textContent='Submitting request…';
   form.submit();
 });
 loadSlots();
+loadPaymentConfig();
 </script>
 </body>
 </html>
