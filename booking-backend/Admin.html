@@ -243,13 +243,13 @@ function render(){
       const msg=confirmationMessage(x);
       const wa='https://wa.me/'+phone+'?text='+encodeURIComponent(msg);
       actions='<div class="row" style="margin-top:14px">'+
-        '<button class="primary" type="button" onclick="openConsultation(\''+esc(x.requestId)+'\\')">Open consultation</button>'+
+        '<button class="primary" type="button" onclick="openConsultation(\''+esc(x.requestId)+'\')">Open consultation</button>'+
         '<a class="action primary" target="_blank" rel="noopener" href="'+esc(x.videoLink)+'">Open Google Meet</a>'+
         '<a class="action whatsapp" target="_blank" rel="noopener" href="'+esc(wa)+'">Send WhatsApp</a>'+
         '<button class="secondary" type="button" onclick="copySms(\''+esc(x.requestId)+'\')">Copy SMS message</button>'+
         '</div>';
     } else if(currentTab==='confirmed') {
-      actions='<div class="row" style="margin-top:14px"><button class="primary" type="button" onclick="openConsultation(\''+esc(x.requestId)+'\\')">Open consultation</button></div><p class="meta">Meet link is not available for this appointment. Please check the Requests sheet.</p>';
+      actions='<div class="row" style="margin-top:14px"><button class="primary" type="button" onclick="openConsultation(\''+esc(x.requestId)+'\')">Open consultation</button></div><p class="meta">Meet link is not available for this appointment. Please check the Requests sheet.</p>';
     } else {
       const approveText=isPriority?'Accept priority & create Meet':'Approve & create Meet';
       actions='<div class="row" style="margin-top:14px"><button class="primary" onclick="decide(\''+esc(x.requestId)+'\',true)">'+approveText+'</button><button class="danger" onclick="decide(\''+esc(x.requestId)+'\',false)">Decline</button></div>';
