@@ -111,6 +111,15 @@ function loadRequests(successNotice){
     .adminGetRequests(sessionToken);
 }
 function esc(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function priorityDeadlineText(requestedAt){
+  const raw=String(requestedAt||'').trim();
+  if(!raw)return 'Received time unavailable';
+  const received=new Date(raw.replace(' ','T')+'+05:30');
+  if(isNaN(received.getTime()))return 'Received: '+raw;
+  const deadline=new Date(received.getTime()+30*60*1000);
+  const time=new Intl.DateTimeFormat('en-IN',{hour:'numeric',minute:'2-digit',timeZone:'Asia/Kolkata'}).format(deadline);
+  return Date.now()>deadline.getTime()?'30-minute response target passed (due '+time+')':'30-minute response target · respond by '+time;
+}
 function render(){
   if(currentTab==='slots'||currentTab==='changes')return;
   const items=data[currentTab]||[], root=document.getElementById('requestList');
@@ -121,7 +130,7 @@ function render(){
     const service='<div class="row" style="align-items:center;gap:8px;margin:6px 0">'+
       (isPriority?'<span class="priority-label">PRIORITY SAME-DAY</span>':'')+
       '<span class="meta">Fee: ₹'+esc(x.consultationFee|| (isPriority?'2000':'500'))+'</span></div>'+
-      (isPriority?'<div class="priority-meta">Expected response: within 30 minutes · Subject to doctor availability</div>':'');
+      (isPriority?'<div class="priority-meta">'+esc(priorityDeadlineText(x.requestedAt))+' · Subject to doctor availability</div>':'');
     let actions='';
     if(currentTab==='confirmed' && x.videoLink){
       const phone=normalisePhone(x.patientPhone);
