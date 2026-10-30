@@ -107,7 +107,7 @@ textarea{resize:vertical;min-height:76px;line-height:1.45}
           <div class="payment-help" id="upiPayeeDisplay"></div>
           <img id="upiQrImage" class="upi-qr hidden" alt="Doctor UPI QR code" loading="lazy">
           <a id="upiPayLink" class="upi-pay" href="#" target="_blank" rel="noopener">Open UPI app to pay</a>
-          <p class="payment-help">Pay only to the UPI ID shown above. Verify the payee name and exact amount in your UPI app before paying. Never share your UPI PIN or OTP.</p>
+          <p class="payment-help">Pay only to the UPI ID shown above. Verify the payee name and exact amount in your UPI app before paying. Never share your UPI PIN or OTP. The slot is held only after you submit the completed request, so submit promptly after paying. If it becomes unavailable, contact the doctor for assistance.</p>
         </div>
       </div>
       <div class="payment-field"><label for="paymentReference">2. UPI transaction reference / UTR</label><input id="paymentReference" name="paymentReference" required maxlength="40" minlength="6" pattern="[A-Za-z0-9]{6,40}" autocomplete="off" placeholder="Enter UPI reference after payment"><p class="fine">Enter the transaction ID / UTR from your UPI app after a successful payment.</p></div>
