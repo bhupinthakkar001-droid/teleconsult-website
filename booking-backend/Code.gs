@@ -109,7 +109,7 @@ function doPost(e) {
   const phoneDigits = phone.replace(/\D/g, '');
   const slotId = cleanText_(p.slotId, 80);
   const visitType = cleanText_(p.visitType, 40);
-  const paymentReference = cleanText_(p.paymentReference, 50).replace(/\\s/g, '');
+  const paymentReference = cleanText_(p.paymentReference, 50).replace(/\s/g, '');
   const paymentConfig = getPublicPaymentConfig_();
   const doctorWhatsApp = PropertiesService.getScriptProperties().getProperty('DOCTOR_WHATSAPP') || '';
 
