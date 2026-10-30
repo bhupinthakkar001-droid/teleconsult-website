@@ -233,6 +233,10 @@ function approveSelectedRequest() {
     ui.alert('This request is not pending.');
     return;
   }
+  if (String(req[12] || '').trim() && String(req[13] || '').toUpperCase() !== 'VERIFIED') {
+    ui.alert('Please verify the ₹' + CONSULTATION_FEE + ' payment reference in the doctor dashboard before approving this booking.');
+    return;
+  }
 
   let meetLink;
   let eventId;
