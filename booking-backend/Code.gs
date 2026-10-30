@@ -1228,7 +1228,7 @@ function adminSavePatientRecord(token, patientId, payload) {
       currentMedicines:cleanMultilineText_(p.currentMedicines,3000),
       clinicalAlerts:cleanMultilineText_(p.clinicalAlerts,2000)
     };
-    if(record.patientName.length<2)throw new Error('Enter the patient's name.');
+    if(record.patientName.length<2)throw new Error("Enter the patient name.");
     if(emrPhoneKey_(record.phone).length<10)throw new Error('Enter a valid patient mobile number.');
     const rows=sheets.patients.getLastRow()<2?[]:sheets.patients.getRange(2,1,sheets.patients.getLastRow()-1,EMR_PATIENT_HEADERS.length).getDisplayValues();
     let target=-1,createdAt=now;
