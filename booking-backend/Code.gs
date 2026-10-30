@@ -1087,7 +1087,7 @@ const EMR_PRESCRIPTION_HEADERS = [
   'prescriptionId','patientId','requestId','patientName','phone',
   'prescriptionDate','prescriptionTime','assessment','clinicalSummary',
   'medicalHistory','allergies','medicinesJson','advice','investigations',
-  'followup','createdAt'
+  'followup','createdAt','pdfFileId','pdfUrl'
 ];
 
 function ensureEmrSheets_() {
@@ -1112,6 +1112,12 @@ function ensureEmrSheets_() {
   } else if (String(prescriptions.getRange(1,1).getDisplayValue()) !== 'prescriptionId') {
     throw new Error('PatientPrescriptions sheet exists with an unexpected layout. Do not edit it manually.');
   }
+  if (prescriptions.getMaxColumns() < EMR_PRESCRIPTION_HEADERS.length) {
+    prescriptions.insertColumnsAfter(prescriptions.getMaxColumns(), EMR_PRESCRIPTION_HEADERS.length - prescriptions.getMaxColumns());
+  }
+  prescriptions.getRange(1,1,1,EMR_PRESCRIPTION_HEADERS.length).setValues([EMR_PRESCRIPTION_HEADERS]);
+  prescriptions.getRange(1,1,1,EMR_PRESCRIPTION_HEADERS.length).setFontWeight('bold');
+  prescriptions.getRange('A:R').setNumberFormat('@');
   return {patients:patients,prescriptions:prescriptions};
 }
 
@@ -1245,7 +1251,30 @@ function adminSavePatientRecord(token, patientId, payload) {
   } finally {lock.releaseLock();}
 }
 
-function savePrescriptionRecord_(saveToken, rawPrescription) {
+function getPrescriptionDriveFolder_() {
+  const props=PropertiesService.getScriptProperties();
+  const savedId=props.getProperty('PRESCRIPTION_DRIVE_FOLDER_ID');
+  if(savedId) {
+    try { return DriveApp.getFolderById(savedId); } catch(e) {}
+  }
+  const name='Dr Bhupin - Patient Prescriptions';
+  const folders=DriveApp.getFoldersByName(name);
+  const folder=folders.hasNext()?folders.next():DriveApp.createFolder(name);
+  props.setProperty('PRESCRIPTION_DRIVE_FOLDER_ID',folder.getId());
+  return folder;
+}
+
+function authorizePrescriptionDriveAccess() {
+  const folder=getPrescriptionDriveFolder_();
+  Logger.log('Private prescription folder ready: '+folder.getName());
+  return folder.getId();
+}
+
+function cleanDriveFileName_(value) {
+  return String(value||'Prescription').replace(/[\\\/:*?"<>|#%{}~&]/g,' ').replace(/\s+/g,' ').trim().slice(0,90) || 'Prescription';
+}
+
+function savePrescriptionRecord_(saveToken, rawPrescription, pdfBase64) {
   if(!/^[A-Fa-f0-9]{64}$/.test(String(saveToken||'')))throw new Error('The EMR save token is invalid or expired.');
   const lock=LockService.getScriptLock();
   lock.waitLock(10000);
@@ -1262,6 +1291,11 @@ function savePrescriptionRecord_(saveToken, rawPrescription) {
       name:cleanText_(m&&m.name,160),dose:cleanText_(m&&m.dose,160),instructions:cleanText_(m&&m.instructions,300)
     })).filter(m=>m.name&&m.dose&&m.instructions):[];
     if(!p.assessment||!medicines.length)throw new Error('Enter an assessment and at least one complete medicine before saving the prescription.');
+    const encodedPdf=String(pdfBase64||'').trim();
+    if(!/^JVBERi0/.test(encodedPdf))throw new Error('The PDF file is missing or invalid. Prepare the prescription PDF again.');
+    if(encodedPdf.length>4000000)throw new Error('The prescription PDF is too large to store. Reduce its size and try again.');
+    const pdfBytes=Utilities.base64Decode(encodedPdf);
+    if(pdfBytes.length<100)throw new Error('The generated PDF appears to be empty. Please generate it again.');
     const sheets=ensureEmrSheets_();
     const patientRows=sheets.patients.getLastRow()<2?[]:sheets.patients.getRange(2,1,sheets.patients.getLastRow()-1,1).getDisplayValues();
     let found=false;
@@ -1269,17 +1303,29 @@ function savePrescriptionRecord_(saveToken, rawPrescription) {
     if(!found)throw new Error('The linked patient EMR record no longer exists.');
     const now=Utilities.formatDate(new Date(),TIME_ZONE,'yyyy-MM-dd HH:mm:ss');
     const prescriptionId='RX'+Utilities.getUuid().replace(/-/g,'').slice(0,12).toUpperCase();
-    sheets.prescriptions.appendRow([
-      prescriptionId,context.patientId,context.requestId,
-      safeCell_(context.patientName),safeCell_(context.phone),
-      cleanText_(p.prescriptionDate,20),cleanText_(p.prescriptionTime,20),
-      cleanMultilineText_(p.assessment,2000),cleanMultilineText_(p.clinical,5000),
-      cleanMultilineText_(p.history,3000),cleanMultilineText_(p.allergies,2000),
-      JSON.stringify(medicines),cleanMultilineText_(p.advice,4000),
-      cleanMultilineText_(p.investigations,2000),cleanMultilineText_(p.followup,2000),now
-    ]);
+    const safePatient=cleanDriveFileName_(context.patientName);
+    const datePart=cleanDriveFileName_(cleanText_(p.prescriptionDate,20));
+    const fileName=safePatient+'_'+datePart+'_'+prescriptionId+'.pdf';
+    const folder=getPrescriptionDriveFolder_();
+    const pdfBlob=Utilities.newBlob(pdfBytes,'application/pdf',fileName);
+    const pdfFile=folder.createFile(pdfBlob);
+    try {
+      sheets.prescriptions.appendRow([
+        prescriptionId,context.patientId,context.requestId,
+        safeCell_(context.patientName),safeCell_(context.phone),
+        cleanText_(p.prescriptionDate,20),cleanText_(p.prescriptionTime,20),
+        cleanMultilineText_(p.assessment,2000),cleanMultilineText_(p.clinical,5000),
+        cleanMultilineText_(p.history,3000),cleanMultilineText_(p.allergies,2000),
+        JSON.stringify(medicines),cleanMultilineText_(p.advice,4000),
+        cleanMultilineText_(p.investigations,2000),cleanMultilineText_(p.followup,2000),now,
+        pdfFile.getId(),pdfFile.getUrl()
+      ]);
+    } catch(writeError) {
+      try { pdfFile.setTrashed(true); } catch(cleanupError) {}
+      throw writeError;
+    }
     cache.remove(key);
-    return {ok:true,prescriptionId:prescriptionId,message:'Prescription saved to the patient EMR.'};
+    return {ok:true,prescriptionId:prescriptionId,pdfUrl:pdfFile.getUrl(),message:'Prescription and PDF saved to the patient EMR and private Google Drive folder.'};
   } finally {lock.releaseLock();}
 }
 
@@ -1288,12 +1334,12 @@ function handlePrescriptionSaveToEmr_(p) {
   const nonce=String(p.nonce||'').replace(/[^A-Za-z0-9_-]/g,'').slice(0,80);
   let result;
   try{
-    result=savePrescriptionRecord_(saveToken,p.prescription||'');
+    result=savePrescriptionRecord_(saveToken,p.prescription||'',p.pdfBase64||'');
   }catch(err){
     result={ok:false,error:err&&err.message?err.message:'Could not save prescription to EMR.'};
   }
   const message={type:'teleconsult-emr-prescription-save',nonce:nonce,ok:!!result.ok,
-    prescriptionId:result.prescriptionId||'',message:result.message||result.error||''};
+    prescriptionId:result.prescriptionId||'',pdfUrl:result.pdfUrl||'',message:result.message||result.error||''};
   const html='<!doctype html><html><body><script>window.parent.postMessage('+JSON.stringify(message)+',"*");</script>Prescription save processed.</body></html>';
   return HtmlService.createHtmlOutput(html).setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
