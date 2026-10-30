@@ -291,7 +291,9 @@ function normalisePhone(value){
   return digits;
 }
 function confirmationMessage(x){
-  return 'Hello '+(x.patientName||'')+', your video consultation with Dr. Bhupin is confirmed. Date: '+x.date+'. Time: '+x.time+'. Appointment: '+(x.visitType||'Video consultation')+'. Join using this Google Meet link: '+x.videoLink+'. Please open the link at the appointment time.';
+  const priority=x.serviceLevel==='PRIORITY';
+  const fee=x.consultationFee||(priority?'2000':'500');
+  return 'Hello '+(x.patientName||'')+', your '+(priority?'priority same-day ':'')+'video consultation with Dr. Bhupin is confirmed. Date: '+x.date+'. Time: '+x.time+'. Appointment: '+(x.visitType||'Video consultation')+'. Consultation fee: ₹'+fee+'. Join using this Google Meet link: '+x.videoLink+'. Please open the link at the appointment time.';
 }
 function copySms(requestId){
   const x=(data.confirmed||[]).find(item=>String(item.requestId)===String(requestId));
