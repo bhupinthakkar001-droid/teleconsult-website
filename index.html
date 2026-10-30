@@ -45,7 +45,10 @@ form{display:grid;gap:13px}.fields{display:grid;grid-template-columns:1fr 1fr;ga
 textarea{resize:vertical;min-height:76px;line-height:1.45}
 .consent-row{display:flex;align-items:flex-start;gap:10px;padding:12px;border:1px solid var(--line);border-radius:12px;background:#f8faf8}
 .consent-row input[type=checkbox]{width:18px;height:18px;flex:0 0 18px;margin:2px 0 0;accent-color:var(--green)}
-.consent-row label{font-size:12px;font-weight:550;line-height:1.45;margin:0}.submit{min-height:52px;border:0;border-radius:13px;background:var(--green);color:#fff;font:inherit;font-weight:800;font-size:15px;cursor:pointer;margin-top:3px}.submit:hover{background:var(--green-dark)}.submit:disabled{opacity:.55;cursor:not-allowed;transform:none}.fine{font-size:11px;line-height:1.45;color:var(--muted);margin:0}.notice{display:none;border-radius:12px;padding:12px;background:var(--pale);color:var(--green);font-size:13px;line-height:1.45}.notice.show{display:block}
+.consent-row label{font-size:12px;font-weight:550;line-height:1.45;margin:0}
+.service-info{border:1px solid var(--line);border-radius:12px;padding:12px;background:#f8faf8;font-size:12px;line-height:1.5;color:var(--muted)}
+.service-info strong{color:var(--ink)}
+.emergency-note{border:1px solid #efc7c2;border-radius:12px;padding:12px;background:#fff6f4;color:#8d2c23;font-size:12px;line-height:1.5}.submit{min-height:52px;border:0;border-radius:13px;background:var(--green);color:#fff;font:inherit;font-weight:800;font-size:15px;cursor:pointer;margin-top:3px}.submit:hover{background:var(--green-dark)}.submit:disabled{opacity:.55;cursor:not-allowed;transform:none}.fine{font-size:11px;line-height:1.45;color:var(--muted);margin:0}.notice{display:none;border-radius:12px;padding:12px;background:var(--pale);color:var(--green);font-size:13px;line-height:1.45}.notice.show{display:block}
 @media(max-width:760px){.condition-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}.condition{font-size:11px;min-height:34px}.topbar{height:58px}.stage{width:min(520px,92%);padding:6px 0 17px}.panel{grid-template-columns:1fr;gap:21px;padding:21px;border-radius:24px}.doctor{gap:17px}.photo{flex-basis:112px;width:112px;border-radius:18px}.info h1{font-size:clamp(23px,6vw,31px)}.qualification{font-size:13px}.qualification-place{font-size:11px}.rule{margin:12px 0 10px}.meta{font-size:12px;margin-top:7px}.action{border-left:0;border-top:1px solid var(--line);padding:20px 0 0}.action h2{font-size:28px;max-width:none;margin:7px 0}.action p{font-size:13px;margin-bottom:16px;max-width:none}.book{min-height:60px;font-size:17px}.under{margin-top:9px}.footer{padding-bottom:12px}}
 @media(max-width:370px){.panel{padding:16px}.doctor{gap:12px}.photo{flex-basis:95px;width:95px}.info h1{font-size:22px}.qualification{font-size:12px}.location{font-size:12px}.fields{grid-template-columns:1fr}.modal{padding:19px}}
 @media(min-width:761px) and (max-height:690px){.topbar{height:54px}.stage{padding-bottom:12px}.panel{padding:22px;gap:28px}.photo{width:142px;flex-basis:142px}.footer{padding-bottom:8px}}
@@ -93,10 +96,13 @@ textarea{resize:vertical;min-height:76px;line-height:1.45}
       <input type="hidden" name="slotId" id="slotId" value="">
       <div><label for="patientName">Your name</label><input id="patientName" name="patientName" required autocomplete="name" maxlength="80" placeholder="Full name"></div>
       <div><label for="phone">Mobile number</label><input id="phone" name="phone" type="tel" required autocomplete="tel" inputmode="tel" maxlength="18" placeholder="Phone number"></div>
+      <div><label for="serviceLevel">Consultation option</label><select id="serviceLevel" name="serviceLevel" required><option value="REGULAR">Regular consultation · ₹500</option><option value="PRIORITY">Priority same-day consultation · ₹2,000</option></select></div>
+      <div class="service-info" id="serviceInfo"><strong>Regular consultation · ₹500</strong><br>Choose any available appointment date and time. Payment arrangements will be confirmed directly by the doctor.</div>
       <div class="fields">
         <div><label for="date">Available date</label><select id="date" name="date" required disabled><option value="">Loading slots…</option></select></div>
         <div><label for="time">Available time</label><select id="time" name="time" required disabled><option value="">Choose date first</option></select></div>
       </div>
+      <div class="emergency-note"><strong>Medical emergency?</strong> Do not wait for an online consultation. Go to the nearest emergency department or call <strong>112</strong> for immediate help. Priority booking is not an emergency service.</div>
       <div><label for="visitType">Appointment type</label><select id="visitType" name="visitType" required><option value="">Choose one</option><option>First consultation</option><option>Follow-up consultation</option></select></div>
       <div><label for="presentingComplaint">What problem are you consulting for, and for how long?</label><textarea id="presentingComplaint" name="presentingComplaint" rows="2" maxlength="1000" minlength="3" required placeholder="For example: fever for 3 days, headache for 1 week"></textarea></div>
       <div><label for="medicalHistory">Any existing diseases or past medical history? <span style="font-weight:500;color:var(--muted)">(Optional)</span></label><textarea id="medicalHistory" name="medicalHistory" rows="2" maxlength="1000" placeholder="For example: diabetes, high BP, asthma, heart or kidney disease"></textarea></div>
@@ -147,6 +153,8 @@ const dateSelect=document.getElementById('date');
 const timeSelect=document.getElementById('time');
 const slotInput=document.getElementById('slotId');
 const submitButton=document.getElementById('submitBooking');
+const serviceLevelSelect=document.getElementById('serviceLevel');
+const serviceInfo=document.getElementById('serviceInfo');
 let availableSlots=[];
 function showNotice(message){notice.textContent=message;notice.classList.add('show')}
 function openModal(){modal.classList.add('open');document.body.style.overflow='hidden';setTimeout(()=>document.getElementById('patientName').focus(),30)}
@@ -208,14 +216,8 @@ function loadSlots(){
       setNoSlots('Could not load availability. Please refresh the page or contact the doctor.');return;
     }
     availableSlots=payload.slots;
-    const dates=[...new Set(availableSlots.map(s=>s.date))];
-    dateSelect.innerHTML='<option value="">Choose a date</option>';
-    dates.forEach(d=>{const o=document.createElement('option');o.value=d;o.textContent=displayDate(d);dateSelect.appendChild(o)});
-    dateSelect.disabled=false;
-    if(!dates.length){setNoSlots('No appointment slots are currently available. Please check again later.');return;}
-    timeSelect.disabled=true;
-    timeSelect.innerHTML='<option value="">Choose a date first</option>';
-    submitButton.disabled=false;
+    if(!availableSlots.length){setNoSlots('No appointment slots are currently available. Please check again later.');return;}
+    updateServiceLevel();
     notice.classList.remove('show');
   };
   const script=document.createElement('script');
@@ -231,7 +233,7 @@ function setNoSlots(message){
 }
 function updateTimes(){
   const date=dateSelect.value;
-  const slots=availableSlots.filter(s=>s.date===date);
+  const slots=slotsForSelectedService().filter(s=>s.date===date);
   timeSelect.innerHTML='<option value="">Choose a time</option>';
   slots.forEach(s=>{
     const o=document.createElement('option');
@@ -241,6 +243,47 @@ function updateTimes(){
   slotInput.value='';
   if(!slots.length)timeSelect.innerHTML='<option value="">No times available</option>';
 }
+function indiaTodayString(){
+  return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+}
+function slotsForSelectedService(){
+  return serviceLevelSelect.value==='PRIORITY'
+    ? availableSlots.filter(s=>s.date===indiaTodayString())
+    : availableSlots;
+}
+function updateServiceLevel(){
+  if(serviceLevelSelect.value==='PRIORITY'){
+    serviceInfo.innerHTML='<strong>Priority same-day consultation · ₹2,000</strong><br>Choose a slot for today. Expected response within 30 minutes, subject to doctor availability. Your request must be accepted by the doctor. Payment arrangements will be confirmed directly.';
+  }else{
+    serviceInfo.innerHTML='<strong>Regular consultation · ₹500</strong><br>Choose any available appointment date and time. Payment arrangements will be confirmed directly by the doctor.';
+  }
+  updateDateOptions();
+}
+function updateDateOptions(){
+  const slots=slotsForSelectedService();
+  const dates=[...new Set(slots.map(s=>s.date))];
+  const previous=dateSelect.value;
+  dateSelect.innerHTML='<option value="">Choose a date</option>';
+  dates.forEach(d=>{const o=document.createElement('option');o.value=d;o.textContent=displayDate(d);dateSelect.appendChild(o)});
+  dateSelect.disabled=!dates.length;
+  timeSelect.innerHTML='<option value="">Choose a date first</option>';
+  timeSelect.disabled=true;
+  slotInput.value='';
+  if(dates.includes(previous)){
+    dateSelect.value=previous;
+    updateTimes();
+  }
+  if(!dates.length){
+    const priority=serviceLevelSelect.value==='PRIORITY';
+    dateSelect.innerHTML='<option value="">No same-day slots available</option>';
+    timeSelect.innerHTML='<option value="">No available times</option>';
+    submitButton.disabled=true;
+    if(priority)serviceInfo.innerHTML+='<br><strong>No priority slots are available today.</strong> Please choose regular consultation or contact the doctor.';
+  }else{
+    submitButton.disabled=false;
+  }
+}
+serviceLevelSelect.addEventListener('change',updateServiceLevel);
 dateSelect.addEventListener('change',updateTimes);
 timeSelect.addEventListener('change',()=>{slotInput.value=timeSelect.value});
 form.addEventListener('submit',e=>{
@@ -250,16 +293,22 @@ form.addEventListener('submit',e=>{
   if(!slotInput.value){
     showNotice('Please select an available date and time.');return;
   }
-  const chosen=availableSlots.find(s=>s.slotId===slotInput.value&&s.date===dateSelect.value);
+  const chosen=slotsForSelectedService().find(s=>s.slotId===slotInput.value&&s.date===dateSelect.value);
   if(!chosen){
     showNotice('That slot is no longer available. Please refresh and select another time.');return;
   }
-  showNotice('Your request is being submitted in a new tab. Follow the instructions there to continue to WhatsApp. The slot will be held as pending if the request is accepted.');
+  if(serviceLevelSelect.value==='PRIORITY' && chosen.date!==indiaTodayString()){
+    showNotice('Priority consultation is available only for slots today. Please refresh and choose a same-day time.');return;
+  }
+  showNotice(serviceLevelSelect.value==='PRIORITY'
+    ? 'Your ₹2,000 priority same-day request is being submitted. Expected response is within 30 minutes, subject to doctor availability. This is not an emergency service.'
+    : 'Your ₹500 regular appointment request is being submitted. The slot will be held as pending until the doctor approves it.');
   submitButton.disabled=true;
   submitButton.textContent='Submitting request…';
   form.submit();
 });
 loadSlots();
+updateServiceLevel();
 </script>
 </body>
 </html>
