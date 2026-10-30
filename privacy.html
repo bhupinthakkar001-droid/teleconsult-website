@@ -27,7 +27,7 @@ footer{max-width:760px;margin:0 auto 24px;padding:0 16px;text-align:center;font-
 <header><div class="brand">Dr. Bhupin Thakkar · Online consultation</div></header>
 <main>
 <h1>Privacy Notice</h1>
-<p class="muted">Effective date: 30 October 2026 · Version: telemedicine-privacy-v1-2026-10-30</p>
+<p class="muted">Effective date: 30 October 2026 · Version: telemedicine-privacy-v2-2026-10-30</p>
 <p>This notice explains how information is collected and used when you request an online consultation with Dr. Bhupin Thakkar through this website.</p>
 
 <h2>1. Information collected</h2>
@@ -37,14 +37,16 @@ footer{max-width:760px;margin:0 auto 24px;padding:0 16px;text-align:center;font-
 <li>Your selected appointment date, time and consultation type, plus a booking reference and booking status.</li>
 <li>Your presenting complaint and how long you have had it.</li>
 <li>Any existing diseases or past medical history that you choose to provide. This field is optional.</li>
+<li>Your UPI transaction reference / UTR, consultation amount and payment verification status and timestamps.</li>
 <li>Your consent choices and the date/time and version of the consent notice.</li>
 </ul>
 <p>During care, the doctor may add further information to a patient record, including age, sex, weight, height, allergies and reactions, chronic conditions, medical/surgical/family history, current medicines and important clinical alerts. Prescription records may include the assessment, clinical summary, medicine names, strengths/doses, instructions, advice, investigations and follow-up details. A separate follow-up schedule may record the patient's linked EMR ID, follow-up due date, a brief reason/note, and whether the reminder is pending, completed or cancelled.</p>
 
 <h2>2. Why the information is used</h2>
-<p>Your information is used to receive and manage your appointment request, contact you about the booking, prepare for and provide the consultation, arrange follow-up where appropriate, and maintain clinical and administrative records. It is not collected through this form for unrelated advertising.</p>
+<p>Your information is used to receive and manage your appointment request, contact you about the booking, verify the UPI transaction reference you submit, prepare for and provide the consultation, arrange follow-up where appropriate, and maintain clinical and administrative records. It is not collected through this form for unrelated advertising.</p>
 
 <h2>3. Where information is stored and who may access it</h2>
+<p>Booking, intake and submitted payment-reference information is processed through Google Apps Script and stored in the Requests sheet linked to the booking system. Payment itself is made through the patient's selected UPI app or bank; the website does not collect UPI PINs, OTPs, card details or banking passwords, and it does not connect to the bank to verify credits automatically. The doctor checks the transaction in the relevant bank/UPI account and records the manual verification decision.</p>
 <p>Booking and intake information is processed through Google Apps Script and stored in a Google Sheet linked to the booking system. Patient profiles, prescription history and follow-up schedules are stored in separate “Patients”, “PatientPrescriptions” and “PatientFollowUps” sheets in the same Google account. The doctor accesses these records through a password-protected dashboard. Follow-up reminders are opened as pre-filled WhatsApp messages for the doctor to review and send manually; the system does not automatically message patients. Google provides the underlying hosting, application and storage services and may process information as necessary to provide those services under its applicable terms and privacy practices.</p>
 <p>If you choose to open and send the pre-filled WhatsApp message, your name, mobile number, appointment details and booking reference are shared with the doctor through WhatsApp. The website's pre-filled booking message does not include the complaint or optional medical-history text. WhatsApp's own terms and privacy practices apply to information handled through that service.</p>
 <p>For a confirmed video consultation, a Google Meet link may be created and shared with you. Google Meet is subject to Google's terms and privacy practices.</p>
