@@ -1,12 +1,10 @@
 const TIME_ZONE = 'Asia/Kolkata';
-const CONSULTATION_FEE = 500;
 const SLOTS_SHEET = 'Slots';
 const REQUESTS_SHEET = 'Requests';
 const REQUEST_HEADERS = [
   'requestId', 'slotId', 'date', 'time',
   'patientName', 'patientPhone', 'visitType', 'status',
-  'requestedAt', 'decisionAt', 'videoLink', 'calendarEventId',
-  'paymentReference', 'paymentStatus', 'paymentVerifiedAt'
+  'requestedAt', 'decisionAt', 'videoLink', 'calendarEventId'
 ];
 
 function onOpen() {
@@ -15,7 +13,6 @@ function onOpen() {
     .addItem('Approve request & create Google Meet', 'approveSelectedRequest')
     .addItem('Decline selected request', 'declineSelectedRequest')
     .addItem('Set doctor dashboard password', 'setDoctorDashboardPassword')
-    .addItem('Configure UPI payment details', 'configureUPIPayment')
     .addSeparator()
     .addItem('Configure doctor WhatsApp', 'configureTeleconsultation')
     .addToUi();
@@ -57,7 +54,6 @@ function setupBookingSystem() {
   } else {
     requests.getRange(1, 11).setValue('videoLink');
     requests.getRange(1, 12).setValue('calendarEventId');
-    ensurePaymentColumns_(requests);
   }
 
   slots.setFrozenRows(1);
@@ -69,19 +65,12 @@ function setupBookingSystem() {
   slots.getRange('A:C').setNumberFormat('@');
   slots.getRange('E:F').setNumberFormat('@');
   requests.getRange('A:F').setNumberFormat('@');
-  requests.getRange('M:O').setNumberFormat('@');
   SpreadsheetApp.getUi().alert('Setup complete. Your existing booking rows have been preserved.');
 }
 
 function doGet(e) {
   const p = (e && e.parameter) || {};
   if (String(p.action || '') === 'admin') return HtmlService.createHtmlOutputFromFile('Admin').setTitle('Doctor Admin Dashboard');
-  if (String(p.action || '') === 'payment') {
-    const config=getPublicPaymentConfig_();
-    const payload=JSON.stringify({ok:!!config.upiId,fee:CONSULTATION_FEE,upiId:config.upiId,payeeName:config.payeeName,
-      message:config.upiId?'':'Doctor UPI details have not been configured yet.'});
-    return jsonpOrJson_(payload,String(p.callback||''));
-  }
   if (String(p.action || '') !== 'slots') {
     return jsonOutput({ ok: true, message: 'Teleconsult booking service is running.' });
   }
@@ -109,16 +98,12 @@ function doPost(e) {
   const phoneDigits = phone.replace(/\D/g, '');
   const slotId = cleanText_(p.slotId, 80);
   const visitType = cleanText_(p.visitType, 40);
-  const paymentReference = cleanText_(p.paymentReference, 50).replace(/\s/g, '');
-  const paymentConfig = getPublicPaymentConfig_();
   const doctorWhatsApp = PropertiesService.getScriptProperties().getProperty('DOCTOR_WHATSAPP') || '';
 
   if (name.length < 2) return receiptPage_('Check your name', 'Please enter your full name and try again.', '');
   if (phoneDigits.length < 10 || phoneDigits.length > 15) return receiptPage_('Check your mobile number', 'Please enter a valid mobile number and try again.', '');
   if (!slotId) return receiptPage_('Choose an appointment time', 'Please return to the website and choose an available time.', '');
   if (!['First consultation', 'Follow-up consultation'].includes(visitType)) return receiptPage_('Choose appointment type', 'Please choose first consultation or follow-up.', '');
-  if (!paymentConfig.upiId) return receiptPage_('Payment setup incomplete', 'The doctor has not configured UPI payment details yet. Please contact the doctor directly.', '');
-  if (!/^[A-Za-z0-9-]{6,50}$/.test(paymentReference)) return receiptPage_('Enter payment reference', 'After paying ₹' + CONSULTATION_FEE + ', enter the UPI transaction reference / UTR and submit again.', '');
   if (!/^\d{10,15}$/.test(doctorWhatsApp)) return receiptPage_('Booking setup incomplete', 'The doctor is still setting up WhatsApp confirmation. Please try again later.', '');
 
   const lock = LockService.getScriptLock();
@@ -130,7 +115,6 @@ function doPost(e) {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     sheet = ss.getSheetByName(SLOTS_SHEET);
     const requests = ss.getSheetByName(REQUESTS_SHEET);
-    if (requests) ensurePaymentColumns_(requests);
     if (!sheet || !requests || sheet.getLastRow() < 2) {
       return receiptPage_('No appointment slots available', 'Please check again later or contact the doctor.', '');
     }
@@ -160,8 +144,7 @@ function doPost(e) {
 
     requests.appendRow([
       requestId, slotId, String(chosen[1]), String(chosen[2]),
-      safeCell_(name), safeCell_(phone), visitType, 'PENDING', now, '', '', '',
-      paymentReference, 'SUBMITTED', ''
+      safeCell_(name), safeCell_(phone), visitType, 'PENDING', now, '', '', ''
     ]);
 
     const msg = [
@@ -171,15 +154,13 @@ function doPost(e) {
       'Preferred date: ' + chosen[1],
       'Preferred time: ' + chosen[2],
       'Appointment type: ' + visitType,
-      'Consultation fee: ₹' + CONSULTATION_FEE,
-      'UPI transaction reference: ' + paymentReference,
       'Request ID: ' + requestId,
       '',
       'Please confirm or decline this request. I understand it is not confirmed until you approve it.'
     ].join('\n');
     const waUrl = 'https://wa.me/' + doctorWhatsApp + '?text=' + encodeURIComponent(msg);
     return receiptPage_('Request received',
-      'Your ₹' + CONSULTATION_FEE + ' payment reference has been recorded. The doctor will verify the payment before confirming your appointment. Your slot is now held as PENDING. Tap below and press Send in WhatsApp.',
+      'Your request has been saved and this slot is now held as PENDING, so other patients will no longer see it. Tap below and press Send in WhatsApp. Your appointment is confirmed only after the doctor approves it.',
       waUrl, requestId);
   } catch (err) {
     if (reserved && sheet && rowIndex > 1) {
@@ -231,10 +212,6 @@ function approveSelectedRequest() {
   const req = reqSheet.getRange(row, 1, 1, Math.max(REQUEST_HEADERS.length, reqSheet.getLastColumn())).getDisplayValues()[0];
   if (String(req[7]).toUpperCase() !== 'PENDING') {
     ui.alert('This request is not pending.');
-    return;
-  }
-  if (String(req[12] || '').trim() && String(req[13] || '').toUpperCase() !== 'VERIFIED') {
-    ui.alert('Please verify the ₹' + CONSULTATION_FEE + ' payment reference in the doctor dashboard before approving this booking.');
     return;
   }
 
@@ -591,13 +568,11 @@ function adminGetRequests(token) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName(REQUESTS_SHEET);
   if (!sheet || sheet.getLastRow() < 2) return {pending:[], confirmed:[]};
-  ensurePaymentColumns_(sheet);
   const rows = sheet.getRange(2, 1, sheet.getLastRow()-1, REQUEST_HEADERS.length).getDisplayValues();
   const pending = [], confirmed = [];
   rows.forEach((r, i) => {
     const item = {row:i+2, requestId:r[0], date:r[2], time:r[3], patientName:r[4],
-      patientPhone:r[5], visitType:r[6], status:r[7], videoLink:r[10],
-      paymentReference:r[12], paymentStatus:r[13], paymentVerifiedAt:r[14]};
+      patientPhone:r[5], visitType:r[6], status:r[7], videoLink:r[10]};
     if (r[7] === 'PENDING') pending.push(item);
     if (r[7] === 'CONFIRMED') confirmed.push(item);
   });
@@ -638,9 +613,6 @@ function processAdminRequest_(requestId, approve) {
     if (slotRow < 0) throw new Error('Could not find the matching held slot.');
     const now = Utilities.formatDate(new Date(), TIME_ZONE, 'yyyy-MM-dd HH:mm:ss');
     if (approve) {
-      if (String(req[12] || '').trim() && String(req[13] || '').toUpperCase() !== 'VERIFIED') {
-        throw new Error('Please verify the ₹' + CONSULTATION_FEE + ' payment reference before confirming this appointment.');
-      }
       const created = createGoogleMeetEvent_(req);
       slots.getRange(slotRow,4).setValue('CONFIRMED');
       reqSheet.getRange(row,8).setValue('CONFIRMED');
@@ -921,9 +893,7 @@ function adminDecideChangeRequest(token, changeId, approve) {
       if(change[5]) releaseChangeHeldSlot_(slots,change[5],change[1]);
       changes.getRange(changeRow,9).setValue('DECLINED');
       changes.getRange(changeRow,11).setValue(now);
-      return {ok:true,message:'Change request declined. The original appointment remains confirmed.',
-        changeType:change[4],patientName:req[4],patientPhone:normalizeWhatsAppPhone_(req[5]),
-        date:req[2],time:req[3],newDate:change[6],newTime:change[7]};
+      return {ok:true,message:'Change request declined. The original appointment remains confirmed.'};
     }
 
     if(change[4]==='CANCEL') {
@@ -934,8 +904,7 @@ function adminDecideChangeRequest(token, changeId, approve) {
       if(req[11] && typeof Calendar!=='undefined' && Calendar.Events) {
         try { Calendar.Events.remove('primary',String(req[11])); } catch(ignored) {}
       }
-      return {ok:true,message:'Appointment cancelled and its slot released.',
-        changeType:'CANCEL',patientName:req[4],patientPhone:normalizeWhatsAppPhone_(req[5]),date:req[2],time:req[3]};
+      return {ok:true,message:'Appointment cancelled and its slot released.'};
     }
 
     if(change[4]==='RESCHEDULE') {
@@ -962,9 +931,7 @@ function adminDecideChangeRequest(token, changeId, approve) {
       if(req[11] && typeof Calendar!=='undefined' && Calendar.Events) {
         try { Calendar.Events.remove('primary',String(req[11])); } catch(ignored) {}
       }
-      return {ok:true,message:'Appointment rescheduled. A new Google Meet link has been created.',
-        changeType:'RESCHEDULE',patientName:req[4],patientPhone:normalizeWhatsAppPhone_(req[5]),
-        date:String(target[1]),time:String(target[2]),meetLink:created.meetLink};
+      return {ok:true,message:'Appointment rescheduled. A new Google Meet link has been created.'};
     }
     throw new Error('Unsupported change request.');
   } finally {
@@ -1002,68 +969,4 @@ function reqsSetCancellation_(requests,row,req) {
 }
 function normalizeDigits_(value) {
   return normalizeWhatsAppPhone_(value);
-}
-
-
-/* ---------------- MANUAL UPI PAYMENT ---------------- */
-function configureUPIPayment() {
-  const ui=SpreadsheetApp.getUi();
-  const props=PropertiesService.getScriptProperties();
-  const currentUpi=props.getProperty('DOCTOR_UPI_ID')||'';
-  const vpaResponse=ui.prompt('Doctor UPI ID',
-    'Enter the UPI ID patients should pay. Example: name@okaxis' + (currentUpi?'\\nCurrent UPI ID: '+currentUpi:''),
-    ui.ButtonSet.OK_CANCEL);
-  if(vpaResponse.getSelectedButton()!==ui.Button.OK)return;
-  const upiId=String(vpaResponse.getResponseText()||'').trim();
-  if(!/^[A-Za-z0-9._-]{2,100}@[A-Za-z0-9.-]{2,64}$/.test(upiId)) {
-    ui.alert('That UPI ID does not look valid. Please check it and try again.');
-    return;
-  }
-  const nameResponse=ui.prompt('UPI payee name',
-    'Enter the name patients should see before confirming payment.',ui.ButtonSet.OK_CANCEL);
-  if(nameResponse.getSelectedButton()!==ui.Button.OK)return;
-  const payee=cleanText_(nameResponse.getResponseText()||'Dr. Bhupin Thakkar',80);
-  if(payee.length<2){ui.alert('Please enter a valid payee name.');return;}
-  props.setProperty('DOCTOR_UPI_ID',upiId);
-  props.setProperty('DOCTOR_UPI_PAYEE',payee);
-  ui.alert('UPI payment details saved. Patients will be asked to pay ₹'+CONSULTATION_FEE+' and submit the transaction reference.');
-}
-
-function getPublicPaymentConfig_() {
-  const props=PropertiesService.getScriptProperties();
-  return {upiId:props.getProperty('DOCTOR_UPI_ID')||'',payeeName:props.getProperty('DOCTOR_UPI_PAYEE')||'Dr. Bhupin Thakkar'};
-}
-
-function jsonpOrJson_(payload, callback) {
-  if(callback && /^[A-Za-z_$][0-9A-Za-z_$]*$/.test(callback)) {
-    return ContentService.createTextOutput(callback+'('+payload+');').setMimeType(ContentService.MimeType.JAVASCRIPT);
-  }
-  return ContentService.createTextOutput(payload).setMimeType(ContentService.MimeType.JSON);
-}
-
-function ensurePaymentColumns_(sheet) {
-  sheet.getRange(1,13,1,3).setValues([['paymentReference','paymentStatus','paymentVerifiedAt']]);
-  sheet.getRange(1,13,1,3).setFontWeight('bold');
-  sheet.getRange('M:O').setNumberFormat('@');
-}
-
-function adminVerifyPayment(token, requestId) {
-  requireAdminSession_(token);
-  const lock=LockService.getScriptLock();
-  lock.waitLock(10000);
-  try {
-    const sheet=SpreadsheetApp.getActiveSpreadsheet().getSheetByName(REQUESTS_SHEET);
-    if(!sheet || sheet.getLastRow()<2) throw new Error('No booking requests were found.');
-    ensurePaymentColumns_(sheet);
-    const rows=sheet.getDataRange().getDisplayValues();
-    let row=-1,req=null;
-    for(let i=1;i<rows.length;i++) if(String(rows[i][0])===String(requestId)){row=i+1;req=rows[i];break;}
-    if(!req || String(req[7]).toUpperCase()!=='PENDING') throw new Error('This booking is no longer pending.');
-    if(!String(req[12]||'').trim()) throw new Error('The patient has not submitted a payment reference.');
-    sheet.getRange(row,14).setValue('VERIFIED');
-    sheet.getRange(row,15).setValue(Utilities.formatDate(new Date(),TIME_ZONE,'yyyy-MM-dd HH:mm:ss'));
-    return {ok:true,message:'Payment marked verified. You can now approve the appointment.'};
-  } finally {
-    lock.releaseLock();
-  }
 }
