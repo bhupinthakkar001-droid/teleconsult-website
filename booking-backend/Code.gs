@@ -968,5 +968,5 @@ function reqsSetCancellation_(requests,row,req) {
   requests.getRange(row,10).setValue(Utilities.formatDate(new Date(),TIME_ZONE,'yyyy-MM-dd HH:mm:ss'));
 }
 function normalizeDigits_(value) {
-  return String(value||'').replace(/\D/g,'');
+  return normalizeWhatsAppPhone_(value);
 }
