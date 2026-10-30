@@ -849,12 +849,26 @@ function adminGetChangeRequests(token) {
   rows.forEach(function(r) {
     if(String(r[8]).toUpperCase()==='PENDING') pending.push({
       changeId:r[0],requestId:r[1],patientPhone:r[2],patientName:r[3],
-      changeType:r[4],newDate:r[6],newTime:r[7],status:r[8]
+      changeType:r[4],newDate:r[6],newTime:r[7],currentDate:findRequestDate_(r[1]),currentTime:findRequestTime_(r[1]),status:r[8]
     });
   });
   return {pending:pending};
 }
 
+function findRequestDate_(requestId) {
+  const sheet=SpreadsheetApp.getActiveSpreadsheet().getSheetByName(REQUESTS_SHEET);
+  if(!sheet || sheet.getLastRow()<2) return '';
+  const rows=sheet.getDataRange().getDisplayValues();
+  for(let i=1;i<rows.length;i++) if(String(rows[i][0])===String(requestId)) return String(rows[i][2]||'');
+  return '';
+}
+function findRequestTime_(requestId) {
+  const sheet=SpreadsheetApp.getActiveSpreadsheet().getSheetByName(REQUESTS_SHEET);
+  if(!sheet || sheet.getLastRow()<2) return '';
+  const rows=sheet.getDataRange().getDisplayValues();
+  for(let i=1;i<rows.length;i++) if(String(rows[i][0])===String(requestId)) return String(rows[i][3]||'');
+  return '';
+}
 function adminDecideChangeRequest(token, changeId, approve) {
   requireAdminSession_(token);
   const lock=LockService.getScriptLock();
