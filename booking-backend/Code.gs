@@ -718,8 +718,8 @@ function adminDeleteSlot(token, slotId) {
 function validateAdminSlotInput_(dateValue, timeValue) {
   const date = String(dateValue || '').trim();
   const rawTime = String(timeValue || '').trim();
-  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date)) throw new Error('Please choose a valid appointment date.');
-  if (!/^([01]\\d|2[0-3]):[0-5]\\d$/.test(rawTime)) throw new Error('Please choose a valid appointment time.');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error('Please choose a valid appointment date.');
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(rawTime)) throw new Error('Please choose a valid appointment time.');
   const start = parseAppointmentDateTime_(date, rawTime);
   if (start.getTime() <= Date.now()) throw new Error('Please choose a future date and time.');
   const parts = rawTime.split(':');
