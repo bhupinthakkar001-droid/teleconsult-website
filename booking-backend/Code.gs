@@ -1336,7 +1336,8 @@ function adminCreatePrescriptionHandoff(token, requestId) {
       patient.surgicalHistory ? 'Surgical history: ' + patient.surgicalHistory : '',
       patient.familyHistory ? 'Family history: ' + patient.familyHistory : '',
       patient.chronicConditions ? 'Chronic conditions: ' + patient.chronicConditions : '',
-      patient.clinicalAlerts ? 'Clinical alerts: ' + patient.clinicalAlerts : ''
+      patient.clinicalAlerts ? 'Clinical alerts: ' + patient.clinicalAlerts : '',
+      patient.height ? 'Height: ' + patient.height + ' cm' : ''
     ].filter(Boolean).join('\n'),
     assessment: '',
     history: [
