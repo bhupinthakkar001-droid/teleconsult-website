@@ -1,0 +1,82 @@
+<!doctype html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    :root{--green:#21634c;--ink:#19362d;--muted:#68776f;--line:#dfe8e1;--bg:#f4f7f4}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,Segoe UI,sans-serif}
+    .wrap{max-width:680px;margin:auto;padding:18px 14px 40px}.top{display:flex;justify-content:space-between;align-items:center;margin:4px 0 18px}
+    h1{font-size:23px;letter-spacing:-.5px;margin:0}h2{font-size:17px;margin:0 0 12px}
+    .muted{color:var(--muted);font-size:13px}.card{background:white;border:1px solid var(--line);border-radius:18px;padding:16px;margin:12px 0;box-shadow:0 3px 14px #19362d08}
+    input{width:100%;padding:14px;border:1px solid var(--line);border-radius:12px;font:inherit;margin:8px 0 12px}
+    button{border:0;border-radius:12px;padding:12px 15px;font:700 14px system-ui;cursor:pointer}
+    .primary{background:var(--green);color:white}.secondary{background:#e8f0ea;color:var(--ink)}.danger{background:#fff0ee;color:#a33b31}
+    .full{width:100%}.row{display:flex;gap:8px;flex-wrap:wrap}.row button{flex:1}
+    .pill{font-size:12px;font-weight:750;border-radius:99px;padding:4px 9px;background:#fff2d8;color:#8b5b08}
+    .meta{font-size:13px;color:var(--muted);margin:3px 0}.name{font-size:17px;font-weight:750;margin-bottom:2px}
+    .empty{text-align:center;color:var(--muted);padding:20px 8px}.hidden{display:none!important}
+    .tabs{display:flex;gap:8px;margin-bottom:12px}.tabs button{flex:1;background:#e8eee9;color:var(--ink)}.tabs button.active{background:var(--green);color:white}
+    .error{color:#a33b31;font-size:13px;margin:8px 0}.success{color:var(--green);font-size:13px;margin:8px 0}
+    a{color:var(--green);font-weight:700;overflow-wrap:anywhere}.small{font-size:12px}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top"><div><h1>Doctor Dashboard</h1><div class="muted">Teleconsult appointments</div></div><button id="logout" class="secondary hidden" onclick="logout()">Log out</button></div>
+  <section id="login" class="card">
+    <h2>Doctor sign in</h2><div class="muted">Private access for Dr. Bhupin</div>
+    <form onsubmit="event.preventDefault();login()">
+      <input id="password" type="password" autocomplete="current-password" placeholder="Dashboard password" required>
+      <button class="primary full" id="loginBtn">Sign in</button>
+    </form><div id="loginError" class="error"></div>
+  </section>
+  <section id="dashboard" class="hidden">
+    <div class="row" style="margin:10px 0 14px">
+      <div class="card" style="flex:1;margin:0"><div class="muted">Pending</div><div id="pendingCount" style="font-size:28px;font-weight:800">0</div></div>
+      <div class="card" style="flex:1;margin:0"><div class="muted">Confirmed</div><div id="confirmedCount" style="font-size:28px;font-weight:800">0</div></div>
+    </div>
+    <div class="tabs"><button id="pendingTab" class="active" onclick="showTab('pending')">Pending</button><button id="confirmedTab" onclick="showTab('confirmed')">Confirmed</button></div>
+    <div id="notice" class="muted" style="margin:8px 2px"></div>
+    <div id="requestList"></div>
+    <button class="secondary full" onclick="loadRequests()">Refresh appointments</button>
+  </section>
+</div>
+<script>
+let sessionToken='', currentTab='pending', data={pending:[],confirmed:[]};
+function showError(id,msg){document.getElementById(id).textContent=msg||''}
+function login(){
+  const btn=document.getElementById('loginBtn');btn.disabled=true;btn.textContent='Signing in…';showError('loginError','');
+  google.script.run.withSuccessHandler(r=>{sessionToken=r.token;document.getElementById('login').classList.add('hidden');document.getElementById('dashboard').classList.remove('hidden');document.getElementById('logout').classList.remove('hidden');loadRequests();})
+    .withFailureHandler(e=>{showError('loginError',e.message||String(e));btn.disabled=false;btn.textContent='Sign in';})
+    .adminLogin(document.getElementById('password').value);
+}
+function logout(){sessionToken='';document.getElementById('dashboard').classList.add('hidden');document.getElementById('logout').classList.add('hidden');document.getElementById('login').classList.remove('hidden');document.getElementById('password').value='';}
+function showTab(tab){currentTab=tab;document.getElementById('pendingTab').classList.toggle('active',tab==='pending');document.getElementById('confirmedTab').classList.toggle('active',tab==='confirmed');render();}
+function loadRequests(){
+  document.getElementById('notice').textContent='Loading appointments…';
+  google.script.run.withSuccessHandler(r=>{data=r;document.getElementById('pendingCount').textContent=r.pending.length;document.getElementById('confirmedCount').textContent=r.confirmed.length;document.getElementById('notice').textContent='';render();})
+    .withFailureHandler(e=>{document.getElementById('notice').textContent=e.message||String(e);if((e.message||'').includes('session expired'))logout();})
+    .adminGetRequests(sessionToken);
+}
+function esc(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function render(){
+  const items=data[currentTab]||[], root=document.getElementById('requestList');
+  if(!items.length){root.innerHTML='<div class="card empty">No '+currentTab+' appointments.</div>';return;}
+  root.innerHTML=items.map(x=>'<article class="card"><div class="row" style="justify-content:space-between;align-items:center"><div class="name">'+esc(x.patientName)+'</div><span class="pill">'+esc(x.status)+'</span></div><div class="meta">'+esc(x.date)+' · '+esc(x.time)+'</div><div class="meta">'+esc(x.visitType)+'</div><div class="meta">Mobile: '+esc(x.patientPhone)+'</div><div class="meta small">Request ID: '+esc(x.requestId)+'</div>'+(currentTab==='pending'?'<div class="row" style="margin-top:14px"><button class="primary" onclick="decide(\''+esc(x.requestId)+'\',true)">Approve & create Meet</button><button class="danger" onclick="decide(\''+esc(x.requestId)+'\',false)">Decline</button></div>':'')+(currentTab==='confirmed'&&x.videoLink?'<p><a target="_blank" rel="noopener" href="'+esc(x.videoLink)+'">Open Google Meet link</a></p>':'')+'</article>').join('');
+}
+function decide(id,approve){
+  const label=approve?'approve this appointment and create a Google Meet link':'decline this appointment and release its slot';
+  if(!confirm('Are you sure you want to '+label+'?'))return;
+  document.getElementById('notice').textContent=approve?'Creating Google Meet and confirming…':'Declining appointment…';
+  const runner=google.script.run.withSuccessHandler(r=>{
+    if(approve){
+      const msg='Hello '+(r.patientName||'')+', your video consultation with Dr. Bhupin is confirmed. Date: '+r.date+'. Time: '+r.time+'. Join using this Google Meet link: '+r.meetLink;
+      document.getElementById('notice').innerHTML='Appointment confirmed. Meet link saved. <a target="_blank" href="https://wa.me/'+encodeURIComponent(r.patientPhone)+'?text='+encodeURIComponent(msg)+'">Open WhatsApp message</a>';
+    } else document.getElementById('notice').textContent='Appointment declined and slot released.';
+    loadRequests();
+  }).withFailureHandler(e=>{document.getElementById('notice').textContent=e.message||String(e);});
+  if(approve)runner.adminApproveRequest(sessionToken,id);else runner.adminDeclineRequest(sessionToken,id);
+}
+</script>
+</body></html>
