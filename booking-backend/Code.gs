@@ -622,7 +622,7 @@ function adminGetRequests(token) {
   const pending = [], confirmed = [];
   rows.forEach((r, i) => {
     const item = {row:i+2, requestId:r[0], date:r[2], time:r[3], patientName:r[4],
-      patientPhone:r[5], visitType:r[6], status:r[7], videoLink:r[10],
+      patientPhone:r[5], visitType:r[6], status:r[7], requestedAt:r[8], videoLink:r[10],
       presentingComplaint:r[12], medicalHistory:r[13], onlineConsultConsent:r[14], consentAt:r[15],
       serviceLevel:r[16] || 'REGULAR', consultationFee:r[17] || '500', responseTarget:r[18] || 'Standard scheduling'};
     if (r[7] === 'PENDING') pending.push(item);
