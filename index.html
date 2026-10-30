@@ -96,7 +96,7 @@ textarea{resize:vertical;min-height:76px;line-height:1.45}
       <input type="hidden" name="slotId" id="slotId" value="">
       <div><label for="patientName">Your name</label><input id="patientName" name="patientName" required autocomplete="name" maxlength="80" placeholder="Full name"></div>
       <div><label for="phone">Mobile number</label><input id="phone" name="phone" type="tel" required autocomplete="tel" inputmode="tel" maxlength="18" placeholder="Phone number"></div>
-      <div><label for="serviceLevel">Consultation option</label><select id="serviceLevel" name="serviceLevel" required><option value="REGULAR">Regular consultation · ₹500</option><option value="PRIORITY">Priority same-day consultation · ₹2,000</option></select></div>
+      <div><label for="serviceLevel">Consultation option</label><select id="serviceLevel" name="serviceLevel" required><option value="REGULAR">Regular consultation · ₹500</option><option value="PRIORITY" hidden disabled>Priority response consultation · ₹2,000</option></select></div>
       <div class="service-info" id="serviceInfo"><strong>Regular consultation · ₹500</strong><br>Choose any available appointment date and time. Payment arrangements will be confirmed directly by the doctor.</div>
       <div class="fields">
         <div><label for="date">Available date</label><select id="date" name="date" required disabled><option value="">Loading slots…</option></select></div>
@@ -154,6 +154,7 @@ const timeSelect=document.getElementById('time');
 const slotInput=document.getElementById('slotId');
 const submitButton=document.getElementById('submitBooking');
 const serviceLevelSelect=document.getElementById('serviceLevel');
+const priorityOption=serviceLevelSelect.querySelector('option[value="PRIORITY"]');
 const serviceInfo=document.getElementById('serviceInfo');
 let availableSlots=[];
 function showNotice(message){notice.textContent=message;notice.classList.add('show')}
@@ -243,17 +244,27 @@ function updateTimes(){
   slotInput.value='';
   if(!slots.length)timeSelect.innerHTML='<option value="">No times available</option>';
 }
-function indiaTodayString(){
-  return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+function loadBookingOptions(){
+  if(!apiReady){priorityOption.hidden=true;priorityOption.disabled=true;return;}
+  window.receiveTeleconsultBookingOptions=function(payload){
+    const enabled=!!(payload&&payload.ok&&payload.priorityEnabled);
+    priorityOption.hidden=!enabled;
+    priorityOption.disabled=!enabled;
+    if(!enabled && serviceLevelSelect.value==='PRIORITY'){
+      serviceLevelSelect.value='REGULAR';
+      updateServiceLevel();
+    }
+  };
+  const script=document.createElement('script');
+  script.src=BOOKING_API_URL+'?action=bookingOptions&callback=receiveTeleconsultBookingOptions&_='+Date.now();
+  script.onerror=()=>{priorityOption.hidden=true;priorityOption.disabled=true;};
 }
 function slotsForSelectedService(){
-  return serviceLevelSelect.value==='PRIORITY'
-    ? availableSlots.filter(s=>s.date===indiaTodayString())
-    : availableSlots;
+  return availableSlots;
 }
 function updateServiceLevel(){
   if(serviceLevelSelect.value==='PRIORITY'){
-    serviceInfo.innerHTML='<strong>Priority same-day consultation · ₹2,000</strong><br>Choose a slot for today. Expected response within 30 minutes, subject to doctor availability. Your request must be accepted by the doctor. Payment arrangements will be confirmed directly.';
+    serviceInfo.innerHTML='<strong>Priority response consultation · ₹2,000</strong><br>We will respond to your booking request within 30 minutes. Your consultation time will be arranged from available slots and confirmed by the doctor. Payment arrangements will be confirmed directly.';
   }else{
     serviceInfo.innerHTML='<strong>Regular consultation · ₹500</strong><br>Choose any available appointment date and time. Payment arrangements will be confirmed directly by the doctor.';
   }
@@ -275,10 +286,9 @@ function updateDateOptions(){
   }
   if(!dates.length){
     const priority=serviceLevelSelect.value==='PRIORITY';
-    dateSelect.innerHTML='<option value="">No same-day slots available</option>';
+    dateSelect.innerHTML='<option value="">No appointment slots available</option>';
     timeSelect.innerHTML='<option value="">No available times</option>';
     submitButton.disabled=true;
-    if(priority)serviceInfo.innerHTML+='<br><strong>No priority slots are available today.</strong> Please choose regular consultation or contact the doctor.';
   }else{
     submitButton.disabled=false;
   }
@@ -297,11 +307,8 @@ form.addEventListener('submit',e=>{
   if(!chosen){
     showNotice('That slot is no longer available. Please refresh and select another time.');return;
   }
-  if(serviceLevelSelect.value==='PRIORITY' && chosen.date!==indiaTodayString()){
-    showNotice('Priority consultation is available only for slots today. Please refresh and choose a same-day time.');return;
-  }
   showNotice(serviceLevelSelect.value==='PRIORITY'
-    ? 'Your ₹2,000 priority same-day request is being submitted. Expected response is within 30 minutes, subject to doctor availability. This is not an emergency service.'
+    ? 'Your ₹2,000 priority response request is being submitted. We will respond within 30 minutes. Your consultation slot is subject to availability and doctor confirmation. This is not an emergency service.'
     : 'Your ₹500 regular appointment request is being submitted. The slot will be held as pending until the doctor approves it.');
   submitButton.disabled=true;
   submitButton.textContent='Submitting request…';
@@ -309,6 +316,7 @@ form.addEventListener('submit',e=>{
 });
 loadSlots();
 updateServiceLevel();
+loadBookingOptions();
 </script>
 </body>
 </html>
