@@ -12,6 +12,7 @@ function onOpen() {
     .createMenu('Teleconsult bookings')
     .addItem('Approve request & create Google Meet', 'approveSelectedRequest')
     .addItem('Decline selected request', 'declineSelectedRequest')
+    .addItem('Set doctor dashboard password', 'setDoctorDashboardPassword')
     .addSeparator()
     .addItem('Configure doctor WhatsApp', 'configureTeleconsultation')
     .addToUi();
@@ -63,6 +64,7 @@ function setupBookingSystem() {
 
 function doGet(e) {
   const p = (e && e.parameter) || {};
+  if (String(p.action || '') === 'admin') return HtmlService.createHtmlOutputFromFile('Admin').setTitle('Doctor Admin Dashboard');
   if (String(p.action || '') !== 'slots') {
     return jsonOutput({ ok: true, message: 'Teleconsult booking service is running.' });
   }
@@ -500,4 +502,122 @@ function authorizeCalendarAccess() {
   SpreadsheetApp.getUi().alert(
     'Calendar permission is working. The temporary test event was removed. Return to Requests and retry the pending booking.'
   );
+}
+
+
+/* ---------------- MOBILE DOCTOR DASHBOARD ----------------
+   Set a password once from the spreadsheet menu. The dashboard
+   uses short-lived server-side sessions; no sheet access is exposed
+   directly to the browser.
+*/
+function setDoctorDashboardPassword() {
+  const ui = SpreadsheetApp.getUi();
+  const response = ui.prompt('Set doctor dashboard password',
+    'Choose a strong password (at least 12 characters). You will use it to sign in to the private mobile dashboard.',
+    ui.ButtonSet.OK_CANCEL);
+  if (response.getSelectedButton() !== ui.Button.OK) return;
+  const password = String(response.getResponseText() || '');
+  if (password.length < 12) {
+    ui.alert('Please use at least 12 characters.');
+    return;
+  }
+  const digest = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, password, Utilities.Charset.UTF_8);
+  PropertiesService.getScriptProperties().setProperty('DOCTOR_ADMIN_PASSWORD_HASH',
+    Utilities.base64Encode(digest));
+  ui.alert('Dashboard password saved. Open your website URL with ?action=admin to sign in.');
+}
+
+function adminLogin(password) {
+  const props = PropertiesService.getScriptProperties();
+  const expected = props.getProperty('DOCTOR_ADMIN_PASSWORD_HASH');
+  if (!expected) throw new Error('Doctor dashboard password is not set. Set it from the Teleconsult bookings menu in the spreadsheet first.');
+  const key = 'ADMIN_LOGIN_FAILS';
+  const cache = CacheService.getScriptCache();
+  const failures = Number(cache.get(key) || 0);
+  if (failures >= 8) throw new Error('Too many attempts. Wait 15 minutes and try again.');
+  const digest = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,
+    String(password || ''), Utilities.Charset.UTF_8);
+  const actual = Utilities.base64Encode(digest);
+  if (actual !== expected) {
+    cache.put(key, String(failures + 1), 900);
+    throw new Error('Incorrect password.');
+  }
+  cache.remove(key);
+  const token = Utilities.getUuid() + Utilities.getUuid();
+  cache.put('ADMIN_SESSION_' + token, '1', 21600);
+  return {token:token};
+}
+
+function requireAdminSession_(token) {
+  if (!token || CacheService.getScriptCache().get('ADMIN_SESSION_' + String(token)) !== '1') {
+    throw new Error('Your session expired. Please sign in again.');
+  }
+}
+
+function adminGetRequests(token) {
+  requireAdminSession_(token);
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(REQUESTS_SHEET);
+  if (!sheet || sheet.getLastRow() < 2) return {pending:[], confirmed:[]};
+  const rows = sheet.getRange(2, 1, sheet.getLastRow()-1, REQUEST_HEADERS.length).getDisplayValues();
+  const pending = [], confirmed = [];
+  rows.forEach((r, i) => {
+    const item = {row:i+2, requestId:r[0], date:r[2], time:r[3], patientName:r[4],
+      patientPhone:r[5], visitType:r[6], status:r[7], videoLink:r[10]};
+    if (r[7] === 'PENDING') pending.push(item);
+    if (r[7] === 'CONFIRMED') confirmed.push(item);
+  });
+  pending.sort((a,b) => (a.date+a.time).localeCompare(b.date+b.time));
+  confirmed.sort((a,b) => (b.date+b.time).localeCompare(a.date+a.time));
+  return {pending:pending, confirmed:confirmed};
+}
+
+function adminApproveRequest(token, requestId) {
+  requireAdminSession_(token);
+  return processAdminRequest_(requestId, true);
+}
+
+function adminDeclineRequest(token, requestId) {
+  requireAdminSession_(token);
+  return processAdminRequest_(requestId, false);
+}
+
+function processAdminRequest_(requestId, approve) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const reqSheet = ss.getSheetByName(REQUESTS_SHEET);
+    const slots = ss.getSheetByName(SLOTS_SHEET);
+    if (!reqSheet || !slots) throw new Error('Booking sheets are missing.');
+    const values = reqSheet.getDataRange().getDisplayValues();
+    let row = -1, req = null;
+    for (let i=1; i<values.length; i++) {
+      if (String(values[i][0]) === String(requestId)) { row=i+1; req=values[i]; break; }
+    }
+    if (!req || String(req[7]).toUpperCase() !== 'PENDING') throw new Error('This request is no longer pending.');
+    const slotRows = slots.getDataRange().getDisplayValues();
+    let slotRow = -1;
+    for (let i=1; i<slotRows.length; i++) {
+      if (String(slotRows[i][0]) === String(req[1]) && String(slotRows[i][7]) === String(req[0])) { slotRow=i+1; break; }
+    }
+    if (slotRow < 0) throw new Error('Could not find the matching held slot.');
+    const now = Utilities.formatDate(new Date(), TIME_ZONE, 'yyyy-MM-dd HH:mm:ss');
+    if (approve) {
+      const created = createGoogleMeetEvent_(req);
+      slots.getRange(slotRow,4).setValue('CONFIRMED');
+      reqSheet.getRange(row,8).setValue('CONFIRMED');
+      reqSheet.getRange(row,10).setValue(now);
+      reqSheet.getRange(row,11).setValue(created.meetLink);
+      return {ok:true, meetLink:created.meetLink, patientPhone:normalizeWhatsAppPhone_(req[5]),
+        patientName:req[4], date:req[2], time:req[3]};
+    }
+    slots.getRange(slotRow,4,1,5).clearContent();
+    slots.getRange(slotRow,4).setValue('AVAILABLE');
+    reqSheet.getRange(row,8).setValue('DECLINED');
+    reqSheet.getRange(row,10).setValue(now);
+    return {ok:true};
+  } finally {
+    lock.releaseLock();
+  }
 }
