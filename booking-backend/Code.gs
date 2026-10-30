@@ -1,4 +1,5 @@
 const TIME_ZONE = 'Asia/Kolkata';
+const CONSENT_VERSION = 'telemedicine-privacy-v1-2026-10-30';
 const SLOTS_SHEET = 'Slots';
 const REQUESTS_SHEET = 'Requests';
 const REQUEST_HEADERS = [
@@ -6,7 +7,8 @@ const REQUEST_HEADERS = [
   'patientName', 'patientPhone', 'visitType', 'status',
   'requestedAt', 'decisionAt', 'videoLink', 'calendarEventId',
   'presentingComplaint', 'medicalHistory', 'onlineConsultConsent', 'consentAt',
-  'serviceLevel', 'consultationFee', 'responseTarget'
+  'serviceLevel', 'consultationFee', 'responseTarget',
+  'dataUseConsent', 'dataConsentAt', 'consentVersion'
 ];
 
 function onOpen() {
@@ -58,6 +60,7 @@ function setupBookingSystem() {
     requests.getRange(1, 12).setValue('calendarEventId');
     ensureIntakeColumns_(requests);
     ensureServiceLevelColumns_(requests);
+    ensureConsentColumns_(requests);
   }
 
   slots.setFrozenRows(1);
@@ -69,7 +72,7 @@ function setupBookingSystem() {
   slots.getRange('A:C').setNumberFormat('@');
   slots.getRange('E:F').setNumberFormat('@');
   requests.getRange('A:F').setNumberFormat('@');
-  requests.getRange('M:S').setNumberFormat('@');
+  requests.getRange('M:V').setNumberFormat('@');
   SpreadsheetApp.getUi().alert('Setup complete. Your existing booking rows have been preserved.');
 }
 
@@ -113,7 +116,8 @@ function doPost(e) {
   const visitType = cleanText_(p.visitType, 40);
   const presentingComplaint = cleanMultilineText_(p.presentingComplaint, 1000);
   const medicalHistory = cleanMultilineText_(p.medicalHistory, 1000);
-  const consentGiven = String(p.onlineConsultConsent || '') === 'yes';
+  const telemedicineConsentGiven = String(p.onlineConsultConsent || '') === 'yes';
+  const dataUseConsentGiven = String(p.dataUseConsent || '') === 'yes';
   const serviceLevel = String(p.serviceLevel || 'REGULAR').toUpperCase();
   const doctorWhatsApp = PropertiesService.getScriptProperties().getProperty('DOCTOR_WHATSAPP') || '';
 
@@ -122,7 +126,8 @@ function doPost(e) {
   if (!slotId) return receiptPage_('Choose an appointment time', 'Please return to the website and choose an available time.', '');
   if (!['First consultation', 'Follow-up consultation'].includes(visitType)) return receiptPage_('Choose appointment type', 'Please choose first consultation or follow-up.', '');
   if (presentingComplaint.length < 3) return receiptPage_('Add your presenting problem', 'Please briefly describe what you are consulting about and how long you have had it.', '');
-  if (!consentGiven) return receiptPage_('Consent required', 'Please confirm your consent to an online consultation before submitting.', '');
+  if (!telemedicineConsentGiven) return receiptPage_('Telemedicine consent required', 'Please confirm that you understand the limitations of online consultation and wish to proceed.', '');
+  if (!dataUseConsentGiven) return receiptPage_('Data-use consent required', 'Please confirm that you agree to the use of your booking and health details for consultation and medical records. See the Privacy Notice.', '');
   if (!['REGULAR','PRIORITY'].includes(serviceLevel)) return receiptPage_('Choose consultation option', 'Please choose regular or priority consultation.', '');
   if (serviceLevel === 'PRIORITY' && !getPriorityBookingsEnabled_()) {
     return receiptPage_('Priority response option unavailable', 'Priority response bookings are temporarily unavailable. Please choose a regular consultation.', '');
@@ -138,7 +143,7 @@ function doPost(e) {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     sheet = ss.getSheetByName(SLOTS_SHEET);
     const requests = ss.getSheetByName(REQUESTS_SHEET);
-    if (requests) { ensureIntakeColumns_(requests); ensureServiceLevelColumns_(requests); }
+    if (requests) { ensureIntakeColumns_(requests); ensureServiceLevelColumns_(requests); ensureConsentColumns_(requests); }
     if (!sheet || !requests || sheet.getLastRow() < 2) {
       return receiptPage_('No appointment slots available', 'Please check again later or contact the doctor.', '');
     }
@@ -171,7 +176,8 @@ function doPost(e) {
       safeCell_(name), safeCell_(phone), visitType, 'PENDING', now, '', '', '',
       safeCell_(presentingComplaint), safeCell_(medicalHistory), 'YES', now,
       serviceLevel, serviceLevel === 'PRIORITY' ? '2000' : '500',
-      serviceLevel === 'PRIORITY' ? '30-minute response' : 'Standard scheduling'
+      serviceLevel === 'PRIORITY' ? '30-minute response' : 'Standard scheduling',
+      'YES', now, CONSENT_VERSION
     ]);
 
     const msg = [
@@ -493,6 +499,12 @@ function ensureIntakeColumns_(sheet) {
   sheet.getRange('M:P').setNumberFormat('@');
 }
 
+function ensureConsentColumns_(sheet) {
+  sheet.getRange(1, 20, 1, 3).setValues([['dataUseConsent', 'dataConsentAt', 'consentVersion']]);
+  sheet.getRange(1, 20, 1, 3).setFontWeight('bold');
+  sheet.getRange('T:V').setNumberFormat('@');
+}
+
 function ensureServiceLevelColumns_(sheet) {
   sheet.getRange(1, 17, 1, 3).setValues([['serviceLevel', 'consultationFee', 'responseTarget']]);
   sheet.getRange(1, 17, 1, 3).setFontWeight('bold');
@@ -620,13 +632,15 @@ function adminGetRequests(token) {
   if (!sheet || sheet.getLastRow() < 2) return {pending:[], confirmed:[]};
   ensureIntakeColumns_(sheet);
   ensureServiceLevelColumns_(sheet);
+  ensureConsentColumns_(sheet);
   const rows = sheet.getRange(2, 1, sheet.getLastRow()-1, REQUEST_HEADERS.length).getDisplayValues();
   const pending = [], confirmed = [];
   rows.forEach((r, i) => {
     const item = {row:i+2, requestId:r[0], date:r[2], time:r[3], patientName:r[4],
       patientPhone:r[5], visitType:r[6], status:r[7], requestedAt:r[8], videoLink:r[10],
       presentingComplaint:r[12], medicalHistory:r[13], onlineConsultConsent:r[14], consentAt:r[15],
-      serviceLevel:r[16] || 'REGULAR', consultationFee:r[17] || '500', responseTarget:r[18] || 'Standard scheduling'};
+      serviceLevel:r[16] || 'REGULAR', consultationFee:r[17] || '500', responseTarget:r[18] || 'Standard scheduling',
+      dataUseConsent:r[19], dataConsentAt:r[20], consentVersion:r[21]};
     if (r[7] === 'PENDING') pending.push(item);
     if (r[7] === 'CONFIRMED') confirmed.push(item);
   });
