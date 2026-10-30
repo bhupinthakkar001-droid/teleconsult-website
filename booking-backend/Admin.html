@@ -152,7 +152,7 @@
         </div>
         <div class="consult-generator">
           <strong>Prescription generator</strong>
-          <div class="muted">Create a one-time, 3-minute handoff to prefill your existing prescription app. The handoff uses a short-lived token; patient details are not placed in the URL. The prescription app remains a TEST-ONLY prototype.</div>
+          <div class="muted">Save the consultation draft, then create a one-time, 3-minute handoff to prefill your prescription app. The handoff uses a short-lived token; patient details are not placed in the URL. TEST-ONLY: only a clearly labelled fictional/demo booking can be transferred.</div>
           <div class="row">
             <button class="primary" type="button" onclick="openPrescriptionGeneratorWithPatient()">Open generator with consultation details</button>
             <a class="action secondary" href="https://ai-clinic-app-mu3y.onrender.com/" target="_blank" rel="noopener">Open blank generator</a>
@@ -364,26 +364,30 @@ function openPrescriptionGeneratorWithPatient(){
     document.getElementById('consultationNotice').textContent='Your browser blocked the new tab. Allow pop-ups for the doctor dashboard and try again.';
     return;
   }
-  try{popup.document.write('<p style="font:16px system-ui;padding:24px">Preparing the prescription workspace…</p>');}catch(e){}
+  try{popup.document.write('<p style="font:16px system-ui;padding:24px">Saving consultation and preparing prescription workspace…</p>');}catch(e){}
   const payload={};
   Object.keys(consultationFields).forEach(key=>{
     payload[key]=document.getElementById(consultationFields[key]).value||'';
   });
-  document.getElementById('consultationNotice').textContent='Creating a secure one-time prescription handoff…';
-  google.script.run.withSuccessHandler(r=>{
-    if(!r || !r.ok || !r.token){
-      try{popup.close();}catch(e){}
-      document.getElementById('consultationNotice').textContent='Could not create the prescription handoff. Please try again.';
-      return;
-    }
-    popup.location.href='https://ai-clinic-app-mu3y.onrender.com/?handoff='+encodeURIComponent(r.token);
-    document.getElementById('consultationNotice').textContent='Prescription app opened. Its one-time handoff expires in 3 minutes.';
+  document.getElementById('consultationNotice').textContent='Saving consultation draft before creating the one-time handoff…';
+  google.script.run.withSuccessHandler(saved=>{
+    google.script.run.withSuccessHandler(r=>{
+      if(!r || !r.ok || !r.token){
+        try{popup.close();}catch(e){}
+        document.getElementById('consultationNotice').textContent='Could not create the prescription handoff. Your consultation draft was saved.';
+        return;
+      }
+      popup.location.href='https://ai-clinic-app-mu3y.onrender.com/?handoff='+encodeURIComponent(r.token);
+      document.getElementById('consultationNotice').textContent='Consultation draft saved. Prescription app opened; its one-time handoff expires in 3 minutes.';
+    }).withFailureHandler(e=>{
+      try{popup.close();}catch(err){}
+      document.getElementById('consultationNotice').textContent=e.message||String(e);
+    }).adminCreatePrescriptionHandoff(sessionToken,currentConsultationBooking.requestId,payload);
   }).withFailureHandler(e=>{
     try{popup.close();}catch(err){}
-    document.getElementById('consultationNotice').textContent=e.message||String(e);
-  }).adminCreatePrescriptionHandoff(sessionToken,currentConsultationBooking.requestId,payload);
+    document.getElementById('consultationNotice').textContent='Could not save the consultation draft: '+(e.message||String(e));
+  }).adminSaveConsultation(sessionToken,currentConsultationBooking.requestId,payload,'DRAFT');
 }
-
 function copyPrescriptionContext(){
   if(!currentConsultationBooking)return;
   const b=currentConsultationBooking;
