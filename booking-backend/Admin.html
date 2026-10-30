@@ -51,6 +51,7 @@
     <div id="requestList"></div>
     <button id="requestRefresh" class="secondary full" onclick="loadRequests()">Refresh appointments</button>
     <section id="changePanel" class="hidden">
+      <div id="changeResult" class="muted" style="margin:8px 2px"></div>
       <div id="changeList"></div>
       <button class="secondary full" type="button" onclick="loadChangeRequests()">Refresh change requests</button>
     </section>
@@ -153,13 +154,25 @@ function renderChangeRequests(){
 function decideChange(changeId,approve){
   const action=approve?'approve this change request':'decline this change request';
   if(!confirm('Are you sure you want to '+action+'?'))return;
-  document.getElementById('notice').textContent=approve?'Processing change request…':'Declining change request…';
+  const result=document.getElementById('changeResult');
+  result.textContent=approve?'Processing change request…':'Declining change request…';
   google.script.run.withSuccessHandler(r=>{
+    const name=r.patientName||'there';
+    let message;
+    if(!approve){
+      message='Hello '+name+', your request to change your appointment could not be approved. Your original appointment remains scheduled for '+r.date+' at '+r.time+'. Please contact the doctor if you need help.';
+    } else if(r.changeType==='CANCEL'){
+      message='Hello '+name+', your appointment with Dr. Bhupin on '+r.date+' at '+r.time+' has been cancelled as requested.';
+    } else {
+      message='Hello '+name+', your appointment with Dr. Bhupin has been rescheduled to '+r.date+' at '+r.time+'. Your new Google Meet link is '+r.meetLink+'. Please use this new link.';
+    }
+    const phone=String(r.patientPhone||'');
+    const wa='https://wa.me/'+phone+'?text='+encodeURIComponent(message);
+    result.innerHTML=esc(r.message||'Change request processed.')+' &nbsp; <a target="_blank" rel="noopener" href="'+esc(wa)+'">Open WhatsApp message to patient</a>';
     loadRequests();
     loadChangeRequests();
-    document.getElementById('notice').textContent=r.message||'Change request processed.';
   }).withFailureHandler(e=>{
-    document.getElementById('notice').textContent=e.message||String(e);
+    result.textContent=e.message||String(e);
   }).adminDecideChangeRequest(sessionToken,changeId,approve);
 }
 function localDateString(){
