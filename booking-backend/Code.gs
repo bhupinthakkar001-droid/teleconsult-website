@@ -4,7 +4,7 @@ const REQUESTS_SHEET = 'Requests';
 const REQUEST_HEADERS = [
   'requestId', 'slotId', 'date', 'time',
   'patientName', 'patientPhone', 'visitType', 'status',
-  'requestedAt', 'decisionAt', 'videoLink'
+  'requestedAt', 'decisionAt', 'videoLink', 'calendarEventId'
 ];
 
 function onOpen() {
@@ -43,6 +43,9 @@ function setupBookingSystem() {
   if (!slots) slots = ss.insertSheet(SLOTS_SHEET);
   let requests = ss.getSheetByName(REQUESTS_SHEET);
   if (!requests) requests = ss.insertSheet(REQUESTS_SHEET);
+  let changes = ss.getSheetByName('ChangeRequests');
+  if (!changes) changes = ss.insertSheet('ChangeRequests');
+  if (changes.getLastRow() === 0) changes.appendRow(['changeId','originalRequestId','patientPhone','patientName','changeType','newSlotId','newDate','newTime','status','requestedAt','decisionAt']);
 
   const slotHeaders = ['slotId', 'date', 'time', 'status', 'patientName', 'patientPhone', 'requestedAt', 'requestId'];
   if (slots.getLastRow() === 0) slots.appendRow(slotHeaders);
@@ -50,12 +53,15 @@ function setupBookingSystem() {
     requests.appendRow(REQUEST_HEADERS);
   } else {
     requests.getRange(1, 11).setValue('videoLink');
+    requests.getRange(1, 12).setValue('calendarEventId');
   }
 
   slots.setFrozenRows(1);
   requests.setFrozenRows(1);
   slots.getRange(1, 1, 1, slotHeaders.length).setFontWeight('bold');
   requests.getRange(1, 1, 1, REQUEST_HEADERS.length).setFontWeight('bold');
+  changes.setFrozenRows(1);
+  changes.getRange(1, 1, 1, 11).setFontWeight('bold');
   slots.getRange('A:C').setNumberFormat('@');
   slots.getRange('E:F').setNumberFormat('@');
   requests.getRange('A:F').setNumberFormat('@');
@@ -79,6 +85,7 @@ function doGet(e) {
 
 function doPost(e) {
   const p = (e && e.parameter) || {};
+  if (String(p.action || '') === 'changeRequest') return handlePatientChangeRequest_(p);
   if (String(p.action || '') !== 'request') {
     return receiptPage_('Request not submitted', 'Please return to the website and try again.', '');
   }
@@ -137,7 +144,7 @@ function doPost(e) {
 
     requests.appendRow([
       requestId, slotId, String(chosen[1]), String(chosen[2]),
-      safeCell_(name), safeCell_(phone), visitType, 'PENDING', now, '', ''
+      safeCell_(name), safeCell_(phone), visitType, 'PENDING', now, '', '', ''
     ]);
 
     const msg = [
@@ -154,7 +161,7 @@ function doPost(e) {
     const waUrl = 'https://wa.me/' + doctorWhatsApp + '?text=' + encodeURIComponent(msg);
     return receiptPage_('Request received',
       'Your request has been saved and this slot is now held as PENDING, so other patients will no longer see it. Tap below and press Send in WhatsApp. Your appointment is confirmed only after the doctor approves it.',
-      waUrl);
+      waUrl, requestId);
   } catch (err) {
     if (reserved && sheet && rowIndex > 1) {
       try {
@@ -249,6 +256,7 @@ function approveSelectedRequest() {
     reqSheet.getRange(row, 8).setValue('CONFIRMED');
     reqSheet.getRange(row, 10).setValue(now);
     reqSheet.getRange(row, 11).setValue(meetLink);
+    reqSheet.getRange(row, 12).setValue(eventId);
 
     const patientName = String(latest[4] || 'there');
     const patientPhoneRaw = String(latest[5] || '');
@@ -455,9 +463,10 @@ function jsonOutput(obj) {
     .setMimeType(ContentService.MimeType.JSON);
 }
 
-function receiptPage_(title, message, waUrl) {
+function receiptPage_(title, message, waUrl, reference) {
   const safeTitle = escapeHtml_(title);
   const safeMessage = escapeHtml_(message);
+  const safeReference = reference ? '<p style="font-size:13px;background:#f4f7f4;border-radius:10px;padding:10px"><strong>Booking reference:</strong> ' + escapeHtml_(reference) + '<br>Please save this ID to manage your appointment later.</p>' : '';
   const waButton = waUrl
     ? '<a class="btn" href="' + escapeHtml_(waUrl) + '" target="_blank" rel="noopener">Continue to WhatsApp →</a>'
     : '';
@@ -469,7 +478,7 @@ function receiptPage_(title, message, waUrl) {
     'h1{font-size:27px;line-height:1.12;letter-spacing:-.04em;margin:18px 0 10px}p{color:#63746a;font-size:14px;margin:0 0 22px}' +
     '.btn{display:block;text-align:center;background:#21634c;color:white;padding:14px 16px;border-radius:13px;text-decoration:none;font-weight:750}' +
     '</style></head><body><main class="card"><div class="mark">✓</div><h1>' + safeTitle + '</h1><p>' + safeMessage + '</p>' +
-    waButton + '<p style="margin:18px 0 0;font-size:12px">The appointment is not final until the doctor confirms it.</p></main></body></html>';
+    safeReference + waButton + '<p style="margin:18px 0 0;font-size:12px">The appointment is not final until the doctor confirms it.</p></main></body></html>';
   return HtmlService.createHtmlOutput(html).setTitle(title);
 }
 
@@ -609,6 +618,7 @@ function processAdminRequest_(requestId, approve) {
       reqSheet.getRange(row,8).setValue('CONFIRMED');
       reqSheet.getRange(row,10).setValue(now);
       reqSheet.getRange(row,11).setValue(created.meetLink);
+      reqSheet.getRange(row,12).setValue(created.eventId);
       return {ok:true, meetLink:created.meetLink, patientPhone:normalizeWhatsAppPhone_(req[5]),
         patientName:req[4], date:req[2], time:req[3]};
     }
@@ -743,4 +753,206 @@ function ensureNoDuplicateSlot_(sheet, date, minutes, exceptSlotId) {
       throw new Error('A slot already exists at this date and time.');
     }
   }
+}
+
+
+/* ---------------- PATIENT CANCELLATION / RESCHEDULING ---------------- */
+function handlePatientChangeRequest_(p) {
+  if (String(p.website || '').trim()) return receiptPage_('Unable to submit', 'Please return to the website and try again.', '');
+  const requestId = cleanText_(p.requestId, 40).toUpperCase();
+  const phone = cleanPhone_(p.phone);
+  const phoneDigits = phone.replace(/\D/g, '');
+  const changeType = String(p.changeType || '').toUpperCase();
+  const newSlotId = cleanText_(p.newSlotId, 80);
+  if (!requestId || phoneDigits.length < 10 || phoneDigits.length > 15) {
+    return receiptPage_('Check your details', 'Enter the booking reference and the mobile number used for the booking.', '');
+  }
+  if (!['CANCEL','RESCHEDULE'].includes(changeType)) return receiptPage_('Invalid request', 'Choose cancellation or rescheduling.', '');
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const requests = ss.getSheetByName(REQUESTS_SHEET);
+    if (!requests || requests.getLastRow() < 2) throw new Error('No booking was found with those details.');
+    const rows = requests.getDataRange().getDisplayValues();
+    let req = null, reqRow = -1;
+    for (let i=1;i<rows.length;i++) {
+      if (String(rows[i][0]).toUpperCase() === requestId &&
+          normalizeDigits_(rows[i][5]) === normalizeDigits_(phone)) {
+        req=rows[i]; reqRow=i+1; break;
+      }
+    }
+    if (!req || String(req[7]).toUpperCase() !== 'CONFIRMED') {
+      throw new Error('We could not verify a confirmed appointment with those details. Check your booking ID and mobile number.');
+    }
+    const changes = getChangeRequestsSheet_();
+    const changeRows = changes.getDataRange().getDisplayValues();
+    for (let i=1;i<changeRows.length;i++) {
+      if (String(changeRows[i][1])===requestId && String(changeRows[i][8]).toUpperCase()==='PENDING') {
+        throw new Error('A change request is already awaiting the doctor’s decision.');
+      }
+    }
+
+    let target = null, targetRow = -1, targetDate = '', targetTime = '';
+    if (changeType === 'RESCHEDULE') {
+      if (!newSlotId) throw new Error('Please choose a new appointment time.');
+      const slots = ss.getSheetByName(SLOTS_SHEET);
+      const slotRows = slots.getDataRange().getDisplayValues();
+      for (let i=1;i<slotRows.length;i++) {
+        if (String(slotRows[i][0])===newSlotId && String(slotRows[i][3]).toUpperCase()==='AVAILABLE') {
+          target=slotRows[i]; targetRow=i+1; break;
+        }
+      }
+      if (!target) throw new Error('That new time is no longer available. Please refresh and choose another.');
+      targetDate=String(target[1]); targetTime=String(target[2]);
+      const slotStart=parseAppointmentDateTime_(targetDate,targetTime);
+      if (slotStart.getTime()<=Date.now()) throw new Error('Please choose a future appointment time.');
+    }
+    const changeId='C'+Utilities.getUuid().replace(/-/g,'').slice(0,10).toUpperCase();
+    const now=Utilities.formatDate(new Date(),TIME_ZONE,'yyyy-MM-dd HH:mm:ss');
+    changes.appendRow([changeId,requestId,phoneDigits,req[4],changeType,newSlotId,targetDate,targetTime,'PENDING',now,'']);
+    if (changeType === 'RESCHEDULE') {
+      const slots=ss.getSheetByName(SLOTS_SHEET);
+      slots.getRange(targetRow,4,1,5).setValues([['CHANGE_PENDING',safeCell_(req[4]),safeCell_(phone),now,requestId]]);
+    }
+    return receiptPage_('Change request received',
+      changeType==='CANCEL'
+        ? 'Your cancellation request has been sent to the doctor. Your appointment remains confirmed until the doctor approves the cancellation.'
+        : 'Your preferred new time has been held temporarily. Your existing appointment remains confirmed until the doctor approves the change.',
+      '');
+  } catch(err) {
+    return receiptPage_('Could not submit request', String(err.message||err), '');
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function getChangeRequestsSheet_() {
+  const ss=SpreadsheetApp.getActiveSpreadsheet();
+  let sheet=ss.getSheetByName('ChangeRequests');
+  if(!sheet) sheet=ss.insertSheet('ChangeRequests');
+  if(sheet.getLastRow()===0) {
+    sheet.appendRow(['changeId','originalRequestId','patientPhone','patientName','changeType','newSlotId','newDate','newTime','status','requestedAt','decisionAt']);
+    sheet.setFrozenRows(1);
+    sheet.getRange(1,1,1,11).setFontWeight('bold');
+  }
+  return sheet;
+}
+
+function adminGetChangeRequests(token) {
+  requireAdminSession_(token);
+  const sheet=getChangeRequestsSheet_();
+  if(sheet.getLastRow()<2) return {pending:[]};
+  const rows=sheet.getRange(2,1,sheet.getLastRow()-1,11).getDisplayValues();
+  const pending=[];
+  rows.forEach(function(r) {
+    if(String(r[8]).toUpperCase()==='PENDING') pending.push({
+      changeId:r[0],requestId:r[1],patientPhone:r[2],patientName:r[3],
+      changeType:r[4],newDate:r[6],newTime:r[7],status:r[8]
+    });
+  });
+  return {pending:pending};
+}
+
+function adminDecideChangeRequest(token, changeId, approve) {
+  requireAdminSession_(token);
+  const lock=LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const ss=SpreadsheetApp.getActiveSpreadsheet();
+    const changes=getChangeRequestsSheet_();
+    const cr=changes.getDataRange().getDisplayValues();
+    let change=null,changeRow=-1;
+    for(let i=1;i<cr.length;i++) if(String(cr[i][0])===String(changeId)){change=cr[i];changeRow=i+1;break;}
+    if(!change || String(change[8]).toUpperCase()!=='PENDING') throw new Error('This change request is no longer pending.');
+    const requests=ss.getSheetByName(REQUESTS_SHEET);
+    const rr=requests.getDataRange().getDisplayValues();
+    let req=null,reqRow=-1;
+    for(let i=1;i<rr.length;i++) if(String(rr[i][0])===String(change[1])){req=rr[i];reqRow=i+1;break;}
+    if(!req || String(req[7]).toUpperCase()!=='CONFIRMED') throw new Error('The original appointment is no longer confirmed.');
+    const slots=ss.getSheetByName(SLOTS_SHEET);
+    const slotRows=slots.getDataRange().getDisplayValues();
+    const now=Utilities.formatDate(new Date(),TIME_ZONE,'yyyy-MM-dd HH:mm:ss');
+
+    if(!approve) {
+      if(change[5]) releaseChangeHeldSlot_(slots,change[5],change[1]);
+      changes.getRange(changeRow,9).setValue('DECLINED');
+      changes.getRange(changeRow,11).setValue(now);
+      return {ok:true,message:'Change request declined. The original appointment remains confirmed.'};
+    }
+
+    if(change[4]==='CANCEL') {
+      releaseOriginalConfirmedSlot_(slots,req[1],req[0]);
+      reqsSetCancellation_(requests,reqRow,req);
+      changes.getRange(changeRow,9).setValue('APPROVED');
+      changes.getRange(changeRow,11).setValue(now);
+      if(req[11] && typeof Calendar!=='undefined' && Calendar.Events) {
+        try { Calendar.Events.remove('primary',String(req[11])); } catch(ignored) {}
+      }
+      return {ok:true,message:'Appointment cancelled and its slot released.'};
+    }
+
+    if(change[4]==='RESCHEDULE') {
+      let targetRow=-1,target=null;
+      for(let i=1;i<slotRows.length;i++) {
+        if(String(slotRows[i][0])===String(change[5]) &&
+           String(slotRows[i][3]).toUpperCase()==='CHANGE_PENDING' &&
+           String(slotRows[i][7])===String(change[1])) {targetRow=i+1;target=slotRows[i];break;}
+      }
+      if(!target) throw new Error('The requested new slot is no longer held. Decline this request and ask the patient to try again.');
+      const revised=req.slice();
+      revised[2]=String(target[1]); revised[3]=String(target[2]);
+      const created=createGoogleMeetEvent_(revised);
+      releaseOriginalConfirmedSlot_(slots,req[1],req[0]);
+      slots.getRange(targetRow,4,1,5).setValues([['CONFIRMED',safeCell_(req[4]),safeCell_(req[5]),now,req[0]]]);
+      requests.getRange(reqRow,2).setValue(String(target[0]));
+      requests.getRange(reqRow,3).setValue(String(target[1]));
+      requests.getRange(reqRow,4).setValue(String(target[2]));
+      requests.getRange(reqRow,10).setValue(now);
+      requests.getRange(reqRow,11).setValue(created.meetLink);
+      requests.getRange(reqRow,12).setValue(created.eventId);
+      changes.getRange(changeRow,9).setValue('APPROVED');
+      changes.getRange(changeRow,11).setValue(now);
+      if(req[11] && typeof Calendar!=='undefined' && Calendar.Events) {
+        try { Calendar.Events.remove('primary',String(req[11])); } catch(ignored) {}
+      }
+      return {ok:true,message:'Appointment rescheduled. A new Google Meet link has been created.'};
+    }
+    throw new Error('Unsupported change request.');
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function releaseChangeHeldSlot_(slots,slotId,requestId) {
+  const rows=slots.getDataRange().getDisplayValues();
+  for(let i=1;i<rows.length;i++) {
+    if(String(rows[i][0])===String(slotId) &&
+       String(rows[i][3]).toUpperCase()==='CHANGE_PENDING' &&
+       String(rows[i][7])===String(requestId)) {
+      slots.getRange(i+1,4,1,5).clearContent();
+      slots.getRange(i+1,4).setValue('AVAILABLE');
+      return;
+    }
+  }
+}
+function releaseOriginalConfirmedSlot_(slots,slotId,requestId) {
+  const rows=slots.getDataRange().getDisplayValues();
+  for(let i=1;i<rows.length;i++) {
+    if(String(rows[i][0])===String(slotId) &&
+       String(rows[i][3]).toUpperCase()==='CONFIRMED' &&
+       String(rows[i][7])===String(requestId)) {
+      slots.getRange(i+1,4,1,5).clearContent();
+      slots.getRange(i+1,4).setValue('AVAILABLE');
+      return;
+    }
+  }
+}
+function reqsSetCancellation_(requests,row,req) {
+  requests.getRange(row,8).setValue('CANCELLED');
+  requests.getRange(row,10).setValue(Utilities.formatDate(new Date(),TIME_ZONE,'yyyy-MM-dd HH:mm:ss'));
+}
+function normalizeDigits_(value) {
+  return String(value||'').replace(/\D/g,'');
 }
