@@ -111,6 +111,7 @@ function doGet(e) {
 
 function doPost(e) {
   const p = (e && e.parameter) || {};
+  if (String(p.action || '') === 'savePrescriptionToEmr') return handlePrescriptionSaveToEmr_(p);
   if (String(p.action || '') === 'changeRequest') return handlePatientChangeRequest_(p);
   if (String(p.action || '') !== 'request') {
     return receiptPage_('Request not submitted', 'Please return to the website and try again.', '');
@@ -1074,6 +1075,223 @@ function findConfirmedBookingForPrescription_(requestId) {
     }
   }
   throw new Error('The appointment could not be found. Refresh the dashboard and try again.');
+}
+
+/* ---------------- PATIENT EMR ---------------- */
+const EMR_PATIENT_HEADERS = [
+  'patientId','patientName','phone','age','sex','allergies','allergyReaction',
+  'chronicConditions','medicalHistory','surgicalHistory','familyHistory',
+  'currentMedicines','clinicalAlerts','createdAt','updatedAt'
+];
+const EMR_PRESCRIPTION_HEADERS = [
+  'prescriptionId','patientId','requestId','patientName','phone',
+  'prescriptionDate','prescriptionTime','assessment','clinicalSummary',
+  'medicalHistory','allergies','medicinesJson','advice','investigations',
+  'followup','createdAt'
+];
+
+function ensureEmrSheets_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let patients = ss.getSheetByName('Patients');
+  if (!patients) patients = ss.insertSheet('Patients');
+  if (patients.getLastRow() === 0) {
+    patients.getRange(1,1,1,EMR_PATIENT_HEADERS.length).setValues([EMR_PATIENT_HEADERS]);
+    patients.setFrozenRows(1);
+    patients.getRange(1,1,1,EMR_PATIENT_HEADERS.length).setFontWeight('bold');
+    patients.getRange('A:O').setNumberFormat('@');
+  } else if (String(patients.getRange(1,1).getDisplayValue()) !== 'patientId') {
+    throw new Error('Patients sheet exists with an unexpected layout. Do not edit it manually.');
+  }
+  let prescriptions = ss.getSheetByName('PatientPrescriptions');
+  if (!prescriptions) prescriptions = ss.insertSheet('PatientPrescriptions');
+  if (prescriptions.getLastRow() === 0) {
+    prescriptions.getRange(1,1,1,EMR_PRESCRIPTION_HEADERS.length).setValues([EMR_PRESCRIPTION_HEADERS]);
+    prescriptions.setFrozenRows(1);
+    prescriptions.getRange(1,1,1,EMR_PRESCRIPTION_HEADERS.length).setFontWeight('bold');
+    prescriptions.getRange('A:P').setNumberFormat('@');
+  } else if (String(prescriptions.getRange(1,1).getDisplayValue()) !== 'prescriptionId') {
+    throw new Error('PatientPrescriptions sheet exists with an unexpected layout. Do not edit it manually.');
+  }
+  return {patients:patients,prescriptions:prescriptions};
+}
+
+function emrPhoneKey_(value) {
+  return String(value || '').replace(/\D/g,'');
+}
+function emrNameKey_(value) {
+  return String(value || '').trim().toLowerCase().replace(/\s+/g,' ');
+}
+function emrPatientFromRow_(r) {
+  return {
+    patientId:String(r[0]||''),patientName:String(r[1]||''),phone:String(r[2]||''),
+    age:String(r[3]||''),sex:String(r[4]||''),allergies:String(r[5]||''),
+    allergyReaction:String(r[6]||''),chronicConditions:String(r[7]||''),
+    medicalHistory:String(r[8]||''),surgicalHistory:String(r[9]||''),
+    familyHistory:String(r[10]||''),currentMedicines:String(r[11]||''),
+    clinicalAlerts:String(r[12]||''),createdAt:String(r[13]||''),updatedAt:String(r[14]||'')
+  };
+}
+function findEmrPatientForBooking_(booking, createIfMissing) {
+  const sheets = ensureEmrSheets_();
+  const sheet = sheets.patients;
+  const phoneKey = emrPhoneKey_(booking.patientPhone);
+  const nameKey = emrNameKey_(booking.patientName);
+  if (sheet.getLastRow() >= 2) {
+    const rows = sheet.getRange(2,1,sheet.getLastRow()-1,EMR_PATIENT_HEADERS.length).getDisplayValues();
+    for (let i=0;i<rows.length;i++) {
+      if (emrPhoneKey_(rows[i][2]) === phoneKey && emrNameKey_(rows[i][1]) === nameKey) {
+        return emrPatientFromRow_(rows[i]);
+      }
+    }
+  }
+  if (!createIfMissing) return null;
+  const now = Utilities.formatDate(new Date(),TIME_ZONE,'yyyy-MM-dd HH:mm:ss');
+  const patient = {
+    patientId:'P'+Utilities.getUuid().replace(/-/g,'').slice(0,12).toUpperCase(),
+    patientName:cleanText_(booking.patientName,80),
+    phone:cleanPhone_(booking.patientPhone),
+    age:'',sex:'',allergies:'',allergyReaction:'',chronicConditions:'',
+    medicalHistory:String(booking.medicalHistory||''),
+    surgicalHistory:'',familyHistory:'',currentMedicines:'',clinicalAlerts:'',
+    createdAt:now,updatedAt:now
+  };
+  const row = EMR_PATIENT_HEADERS.map(h=>patient[h]||'').map(safeCell_);
+  sheet.appendRow(row);
+  return patient;
+}
+
+function adminSearchPatients(token, query) {
+  requireAdminSession_(token);
+  const sheets = ensureEmrSheets_();
+  const q = String(query||'').trim().toLowerCase();
+  const rows = sheets.patients.getLastRow() < 2 ? [] :
+    sheets.patients.getRange(2,1,sheets.patients.getLastRow()-1,EMR_PATIENT_HEADERS.length).getDisplayValues();
+  const results = [];
+  for (let i=rows.length-1;i>=0;i--) {
+    const patient = emrPatientFromRow_(rows[i]);
+    if (!q || patient.patientName.toLowerCase().includes(q) || emrPhoneKey_(patient.phone).includes(emrPhoneKey_(q)) || patient.patientId.toLowerCase().includes(q)) {
+      results.push({patientId:patient.patientId,patientName:patient.patientName,phone:patient.phone,allergies:patient.allergies,chronicConditions:patient.chronicConditions,updatedAt:patient.updatedAt});
+      if (results.length >= 40) break;
+    }
+  }
+  return {ok:true,patients:results};
+}
+
+function adminGetPatientRecord(token, patientId) {
+  requireAdminSession_(token);
+  const sheets = ensureEmrSheets_();
+  const id = cleanText_(patientId,40);
+  const rows = sheets.patients.getLastRow()<2?[]:sheets.patients.getRange(2,1,sheets.patients.getLastRow()-1,EMR_PATIENT_HEADERS.length).getDisplayValues();
+  let patient = null;
+  for (let i=0;i<rows.length;i++) if(String(rows[i][0])===id){patient=emrPatientFromRow_(rows[i]);break;}
+  if(!patient) throw new Error('Patient record not found. Refresh the EMR list.');
+  const rxRows = sheets.prescriptions.getLastRow()<2?[]:sheets.prescriptions.getRange(2,1,sheets.prescriptions.getLastRow()-1,EMR_PRESCRIPTION_HEADERS.length).getDisplayValues();
+  const prescriptions=[];
+  for(let i=rxRows.length-1;i>=0;i--){
+    const r=rxRows[i];
+    if(String(r[1])===id) {
+      let medicines=[];
+      try{medicines=JSON.parse(r[11]||'[]');}catch(e){}
+      prescriptions.push({
+        prescriptionId:r[0],requestId:r[2],prescriptionDate:r[5],prescriptionTime:r[6],
+        assessment:r[7],medicines:medicines,advice:r[12],investigations:r[13],followup:r[14],createdAt:r[15]
+      });
+      if(prescriptions.length>=30)break;
+    }
+  }
+  return {ok:true,patient:patient,prescriptions:prescriptions};
+}
+
+function adminSavePatientRecord(token, patientId, payload) {
+  requireAdminSession_(token);
+  const lock=LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const sheets=ensureEmrSheets_();
+    const p=payload||{};
+    const id=cleanText_(patientId,40);
+    const now=Utilities.formatDate(new Date(),TIME_ZONE,'yyyy-MM-dd HH:mm:ss');
+    const record={
+      patientId:id||('P'+Utilities.getUuid().replace(/-/g,'').slice(0,12).toUpperCase()),
+      patientName:cleanText_(p.patientName,80),
+      phone:cleanPhone_(p.phone),
+      age:cleanText_(p.age,3),
+      sex:cleanText_(p.sex,30),
+      allergies:cleanMultilineText_(p.allergies,2000),
+      allergyReaction:cleanMultilineText_(p.allergyReaction,2000),
+      chronicConditions:cleanMultilineText_(p.chronicConditions,3000),
+      medicalHistory:cleanMultilineText_(p.medicalHistory,4000),
+      surgicalHistory:cleanMultilineText_(p.surgicalHistory,2000),
+      familyHistory:cleanMultilineText_(p.familyHistory,2000),
+      currentMedicines:cleanMultilineText_(p.currentMedicines,3000),
+      clinicalAlerts:cleanMultilineText_(p.clinicalAlerts,2000)
+    };
+    if(record.patientName.length<2)throw new Error('Enter the patient's name.');
+    if(emrPhoneKey_(record.phone).length<10)throw new Error('Enter a valid patient mobile number.');
+    const rows=sheets.patients.getLastRow()<2?[]:sheets.patients.getRange(2,1,sheets.patients.getLastRow()-1,EMR_PATIENT_HEADERS.length).getDisplayValues();
+    let target=-1,createdAt=now;
+    for(let i=0;i<rows.length;i++){
+      if(String(rows[i][0])===record.patientId){target=i+2;createdAt=String(rows[i][13]||now);break;}
+    }
+    record.createdAt=createdAt;record.updatedAt=now;
+    const row=EMR_PATIENT_HEADERS.map(h=>safeCell_(record[h]||''));
+    if(target>0)sheets.patients.getRange(target,1,1,row.length).setValues([row]);
+    else sheets.patients.appendRow(row);
+    return {ok:true,patientId:record.patientId,updatedAt:now,message:id?'Patient record updated.':'New patient record created.'};
+  } finally {lock.releaseLock();}
+}
+
+function savePrescriptionRecord_(saveToken, rawPrescription) {
+  if(!/^[A-Fa-f0-9]{64}$/.test(String(saveToken||'')))throw new Error('The EMR save token is invalid or expired.');
+  const lock=LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const cache=CacheService.getScriptCache();
+    const key='RX_SAVE_'+saveToken;
+    const raw=cache.get(key);
+    if(!raw)throw new Error('The prescription save token has expired or was already used. Reopen Create prescription and try again.');
+    let context;
+    try{context=JSON.parse(raw);}catch(e){throw new Error('The prescription save request could not be validated.');}
+    let p;
+    try{p=JSON.parse(String(rawPrescription||''));}catch(e){throw new Error('Prescription data is not valid.');}
+    const medicines=Array.isArray(p.medicines)?p.medicines.slice(0,30).map(m=>({
+      name:cleanText_(m&&m.name,160),dose:cleanText_(m&&m.dose,160),instructions:cleanText_(m&&m.instructions,300)
+    })).filter(m=>m.name&&m.dose&&m.instructions):[];
+    if(!p.assessment||!medicines.length)throw new Error('Enter an assessment and at least one complete medicine before saving the prescription.');
+    const sheets=ensureEmrSheets_();
+    const patientRows=sheets.patients.getLastRow()<2?[]:sheets.patients.getRange(2,1,sheets.patients.getLastRow()-1,1).getDisplayValues();
+    let found=false;
+    for(let i=0;i<patientRows.length;i++)if(String(patientRows[i][0])===context.patientId){found=true;break;}
+    if(!found)throw new Error('The linked patient EMR record no longer exists.');
+    const now=Utilities.formatDate(new Date(),TIME_ZONE,'yyyy-MM-dd HH:mm:ss');
+    const prescriptionId='RX'+Utilities.getUuid().replace(/-/g,'').slice(0,12).toUpperCase();
+    sheets.prescriptions.appendRow([
+      prescriptionId,context.patientId,context.requestId,
+      safeCell_(context.patientName),safeCell_(context.phone),
+      cleanText_(p.prescriptionDate,20),cleanText_(p.prescriptionTime,20),
+      cleanMultilineText_(p.assessment,2000),cleanMultilineText_(p.clinical,5000),
+      cleanMultilineText_(p.history,3000),cleanMultilineText_(p.allergies,2000),
+      JSON.stringify(medicines),cleanMultilineText_(p.advice,4000),
+      cleanMultilineText_(p.investigations,2000),cleanMultilineText_(p.followup,2000),now
+    ]);
+    cache.remove(key);
+    return {ok:true,prescriptionId:prescriptionId,message:'Prescription saved to the patient EMR.'};
+  } finally {lock.releaseLock();}
+}
+
+function handlePrescriptionSaveToEmr_(p) {
+  const saveToken=String(p.saveToken||'');
+  const nonce=String(p.nonce||'').replace(/[^A-Za-z0-9_-]/g,'').slice(0,80);
+  let result;
+  try{
+    result=savePrescriptionRecord_(saveToken,p.prescription||'');
+  }catch(err){
+    result={ok:false,error:err&&err.message?err.message:'Could not save prescription to EMR.'};
+  }
+  const message={type:'teleconsult-emr-prescription-save',nonce:nonce,ok:!!result.ok,
+    prescriptionId:result.prescriptionId||'',message:result.message||result.error||''};
+  const html='<!doctype html><html><body><script>window.parent.postMessage('+JSON.stringify(message)+',"*");</script>Prescription save processed.</body></html>';
+  return HtmlService.createHtmlOutput(html).setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
 /* ---------------- ONE-TIME PRESCRIPTION HANDOFF ----------------
