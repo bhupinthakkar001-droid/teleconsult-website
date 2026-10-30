@@ -145,6 +145,7 @@ function renderChangeRequests(){
     return '<article class="card"><div class="name">'+esc(x.patientName)+'</div>'+
       '<div class="meta">Current booking ID: '+esc(x.requestId)+'</div>'+
       '<div class="meta">Patient mobile: '+esc(x.patientPhone)+'</div>'+
+      '<div class="meta">Current appointment: '+esc(x.currentDate)+' · '+esc(x.currentTime)+'</div>'+
       '<div class="meta">Request type: '+(reschedule?'Reschedule':'Cancellation')+'</div>'+requested+
       '<div class="row" style="margin-top:14px"><button class="primary" type="button" onclick="decideChange(\''+esc(x.changeId)+'\',true)">Approve request</button><button class="danger" type="button" onclick="decideChange(\''+esc(x.changeId)+'\',false)">Decline request</button></div></article>';
   }).join('');
@@ -183,7 +184,7 @@ function renderSlots(){
     const available=x.status==='AVAILABLE';
     const controls=available
       ? '<div class="slot-actions"><button class="secondary" type="button" onclick="editSlot(\''+esc(x.slotId)+'\')">Edit</button><button class="danger" type="button" onclick="removeSlot(\''+esc(x.slotId)+'\')">Remove</button></div>'
-      : '<div class="meta small">This slot is locked because it has a '+(x.status==='PENDING'?'pending request':'confirmed appointment')+'. Manage it from the appointment tabs.</div>';
+      : '<div class="meta small">This slot is locked because it has a '+(x.status==='PENDING'?'pending request':(x.status==='CHANGE_PENDING'?'pending reschedule request':'confirmed appointment'))+'. Manage it from the appointment tabs.</div>';
     return '<article class="card"><div class="row" style="justify-content:space-between;align-items:center"><div class="name">'+esc(x.date)+'</div><span class="pill">'+esc(x.status)+'</span></div><div class="meta">'+esc(x.time)+'</div>'+controls+'</article>';
   }).join('');
 }
