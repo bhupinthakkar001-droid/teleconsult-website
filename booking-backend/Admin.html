@@ -320,6 +320,10 @@ function render(){
       (isPriority?'<span class="priority-label">PRIORITY RESPONSE</span>':'')+
       '<span class="meta">Fee: ₹'+esc(x.consultationFee|| (isPriority?'2000':'500'))+'</span></div>'+
       (isPriority?'<div class="priority-meta">'+esc(priorityDeadlineText(x.requestedAt))+' · Subject to doctor availability</div>':'');
+    const paymentStatus=String(x.paymentStatus||'NOT SUBMITTED').toUpperCase();
+    const paymentInfo='<div class="payment-status '+(paymentStatus==='VERIFIED'?'verified':'')+'"><strong>Payment: '+esc(paymentStatus)+'</strong>'+
+      (x.paymentReference?'<br>UPI reference: '+esc(x.paymentReference):'<br>No UPI reference recorded')+
+      (x.paymentVerifiedAt?'<br>Verified: '+esc(x.paymentVerifiedAt):'')+'</div>';
     let actions='';
     if(currentTab==='confirmed' && x.videoLink){
       const phone=normalisePhone(x.patientPhone);
@@ -335,7 +339,13 @@ function render(){
       actions='<div class="row" style="margin-top:14px"><button class="primary" type="button" onclick="openPrescriptionGeneratorWithBooking(\''+esc(x.requestId)+'\')">Create prescription</button></div><p class="meta">Meet link is not available for this appointment. Please check the Requests sheet.</p>';
     } else {
       const approveText=isPriority?'Accept priority & create Meet':'Approve & create Meet';
-      actions='<div class="row" style="margin-top:14px"><button class="primary" onclick="decide(\''+esc(x.requestId)+'\',true)">'+approveText+'</button><button class="danger" onclick="decide(\''+esc(x.requestId)+'\',false)">Decline</button></div>';
+      const verifyButton=paymentStatus==='SUBMITTED'
+        ? '<button class="secondary" type="button" onclick="verifyPayment(\''+esc(x.requestId)+'\')">Verify payment</button>'
+        : '';
+      const approvalButton=paymentStatus==='VERIFIED'
+        ? '<button class="primary" type="button" onclick="decide(\''+esc(x.requestId)+'\',true)">'+approveText+'</button>'
+        : '<button class="primary" type="button" disabled title="Verify the UPI transaction first">Verify payment before approval</button>';
+      actions=paymentInfo+'<div class="muted small">Compare the UPI reference and exact fee against your bank/UPI transaction history before verifying. The system does not check bank payments automatically.</div><div class="row" style="margin-top:14px">'+verifyButton+approvalButton+'<button class="danger" type="button" onclick="decide(\''+esc(x.requestId)+'\',false)">Decline</button></div>';
     }
     const intake='<details class="intake-details"><summary>Patient intake details</summary><div class="intake-body">'+
       '<div><strong>Presenting complaint & duration</strong><p>'+esc(x.presentingComplaint||'Not recorded for this booking.')+'</p></div>'+
@@ -344,7 +354,7 @@ function render(){
       '<div><strong>Health information use consent</strong><p>'+(x.dataUseConsent==='YES'?'Recorded':'Not recorded for this booking')+(x.dataConsentAt?' · '+esc(x.dataConsentAt):'')+'</p></div>'+
       '<div><strong>Consent wording version</strong><p>'+esc(x.consentVersion||'Older booking / version not recorded')+'</p></div>'+
       '</div></details>';
-    return '<article class="'+cardClass+'"><div class="row" style="justify-content:space-between;align-items:center"><div class="name">'+esc(x.patientName)+'</div><span class="pill">'+esc(x.status)+'</span></div><div class="meta">'+esc(x.date)+' · '+esc(x.time)+'</div><div class="meta">'+esc(x.visitType)+'</div><div class="meta">Mobile: '+esc(x.patientPhone)+'</div><div class="meta small">Request ID: '+esc(x.requestId)+'</div>'+service+intake+actions+'</article>';
+    return '<article class="'+cardClass+'"><div class="row" style="justify-content:space-between;align-items:center"><div class="name">'+esc(x.patientName)+'</div><span class="pill">'+esc(x.status)+'</span></div><div class="meta">'+esc(x.date)+' · '+esc(x.time)+'</div><div class="meta">'+esc(x.visitType)+'</div><div class="meta">Mobile: '+esc(x.patientPhone)+'</div><div class="meta small">Request ID: '+esc(x.requestId)+'</div>'+service+paymentInfo+intake+actions+'</article>';
   }).join('');
 }
 
@@ -718,6 +728,16 @@ function copySms(requestId){
   if(navigator.clipboard && navigator.clipboard.writeText){
     navigator.clipboard.writeText(message).then(()=>{document.getElementById('notice').textContent='SMS message copied. Paste it into your phone Messages app and send it to '+x.patientPhone+'.';}).catch(fallback);
   } else fallback();
+}
+function verifyPayment(id){
+  const item=(data.pending||[]).find(x=>String(x.requestId)===String(id));
+  if(!item)return;
+  const amount=String(item.paymentAmount||item.consultationFee||'');
+  if(!confirm('Have you independently confirmed that ₹'+amount+' was credited to your bank/UPI account and that the transaction reference matches? Only continue after checking your actual transaction history.'))return;
+  document.getElementById('notice').textContent='Verifying payment record…';
+  google.script.run.withSuccessHandler(r=>loadRequests(r.message||'Payment verified. You can now approve the appointment.'))
+    .withFailureHandler(e=>{document.getElementById('notice').textContent=e.message||String(e);})
+    .adminVerifyPayment(sessionToken,id);
 }
 function decide(id,approve){
   const label=approve?'approve this appointment and create a Google Meet link':'decline this appointment and release its slot';
