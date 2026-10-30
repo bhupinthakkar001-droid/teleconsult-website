@@ -1108,6 +1108,11 @@ const EMR_PRESCRIPTION_HEADERS = [
   'followup','createdAt','pdfFileId','pdfUrl'
 ];
 
+const EMR_FOLLOWUP_HEADERS = [
+  'followUpId','patientId','patientName','phone','dueDate','reason',
+  'status','createdAt','updatedAt','completedAt'
+];
+
 function ensureEmrSheets_() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let patients = ss.getSheetByName('Patients');
@@ -1136,7 +1141,22 @@ function ensureEmrSheets_() {
   prescriptions.getRange(1,1,1,EMR_PRESCRIPTION_HEADERS.length).setValues([EMR_PRESCRIPTION_HEADERS]);
   prescriptions.getRange(1,1,1,EMR_PRESCRIPTION_HEADERS.length).setFontWeight('bold');
   prescriptions.getRange('A:R').setNumberFormat('@');
-  return {patients:patients,prescriptions:prescriptions};
+  let followUps = ss.getSheetByName('PatientFollowUps');
+  if (!followUps) followUps = ss.insertSheet('PatientFollowUps');
+  if (followUps.getLastRow() === 0) {
+    followUps.getRange(1,1,1,EMR_FOLLOWUP_HEADERS.length).setValues([EMR_FOLLOWUP_HEADERS]);
+    followUps.setFrozenRows(1);
+    followUps.getRange(1,1,1,EMR_FOLLOWUP_HEADERS.length).setFontWeight('bold');
+  } else if (String(followUps.getRange(1,1).getDisplayValue()) !== 'followUpId') {
+    throw new Error('PatientFollowUps sheet exists with an unexpected layout. Do not edit it manually.');
+  }
+  if (followUps.getMaxColumns() < EMR_FOLLOWUP_HEADERS.length) {
+    followUps.insertColumnsAfter(followUps.getMaxColumns(), EMR_FOLLOWUP_HEADERS.length-followUps.getMaxColumns());
+  }
+  followUps.getRange(1,1,1,EMR_FOLLOWUP_HEADERS.length).setValues([EMR_FOLLOWUP_HEADERS]);
+  followUps.getRange(1,1,1,EMR_FOLLOWUP_HEADERS.length).setFontWeight('bold');
+  followUps.getRange('A:J').setNumberFormat('@');
+  return {patients:patients,prescriptions:prescriptions,followUps:followUps};
 }
 
 function emrPhoneKey_(value) {
@@ -1227,6 +1247,80 @@ function adminGetPatientRecord(token, patientId) {
     }
   }
   return {ok:true,patient:patient,prescriptions:prescriptions};
+}
+
+function adminListFollowUps(token) {
+  requireAdminSession_(token);
+  const sheets=ensureEmrSheets_();
+  const sheet=sheets.followUps;
+  const rows=sheet.getLastRow()<2?[]:sheet.getRange(2,1,sheet.getLastRow()-1,EMR_FOLLOWUP_HEADERS.length).getDisplayValues();
+  const items=[];
+  for(let i=rows.length-1;i>=0;i--){
+    const r=rows[i];
+    items.push({
+      followUpId:String(r[0]||''),patientId:String(r[1]||''),patientName:String(r[2]||''),
+      phone:String(r[3]||''),dueDate:String(r[4]||''),reason:String(r[5]||''),
+      status:String(r[6]||'PENDING').toUpperCase(),createdAt:String(r[7]||''),
+      updatedAt:String(r[8]||''),completedAt:String(r[9]||'')
+    });
+    if(items.length>=300)break;
+  }
+  return {ok:true,followUps:items};
+}
+
+function adminSaveFollowUp(token, payload) {
+  requireAdminSession_(token);
+  const lock=LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const sheets=ensureEmrSheets_();
+    const p=payload||{};
+    const patientId=cleanText_(p.patientId,40);
+    const dueDate=String(p.dueDate||'').trim();
+    if(!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(dueDate))throw new Error('Choose a valid follow-up date.');
+    const parts=dueDate.split('-').map(Number);
+    const parsedDate=new Date(parts[0],parts[1]-1,parts[2]);
+    if(parsedDate.getFullYear()!==parts[0]||parsedDate.getMonth()!==parts[1]-1||parsedDate.getDate()!==parts[2])throw new Error('The follow-up date is invalid.');
+    const patientRows=sheets.patients.getLastRow()<2?[]:sheets.patients.getRange(2,1,sheets.patients.getLastRow()-1,EMR_PATIENT_HEADERS.length).getDisplayValues();
+    let patient=null;
+    for(let i=0;i<patientRows.length;i++){
+      if(String(patientRows[i][0])===patientId){patient=emrPatientFromRow_(patientRows[i]);break;}
+    }
+    if(!patient)throw new Error('Select a saved patient record before scheduling follow-up.');
+    const now=Utilities.formatDate(new Date(),TIME_ZONE,'yyyy-MM-dd HH:mm:ss');
+    const followUpId='FU'+Utilities.getUuid().replace(/-/g,'').slice(0,12).toUpperCase();
+    const reason=cleanMultilineText_(p.reason,300);
+    sheets.followUps.appendRow([
+      followUpId,patient.patientId,safeCell_(patient.patientName),safeCell_(patient.phone),
+      dueDate,safeCell_(reason),'PENDING',now,now,''
+    ]);
+    return {ok:true,followUpId:followUpId,patientName:patient.patientName,dueDate:dueDate,message:'Follow-up scheduled.'};
+  } finally {lock.releaseLock();}
+}
+
+function adminUpdateFollowUpStatus(token, followUpId, status) {
+  requireAdminSession_(token);
+  const next=String(status||'').toUpperCase();
+  if(!['PENDING','COMPLETED','CANCELLED'].includes(next))throw new Error('Invalid follow-up status.');
+  const lock=LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const sheet=ensureEmrSheets_().followUps;
+    if(sheet.getLastRow()<2)throw new Error('Follow-up record not found.');
+    const id=cleanText_(followUpId,40);
+    const values=sheet.getRange(2,1,sheet.getLastRow()-1,EMR_FOLLOWUP_HEADERS.length).getDisplayValues();
+    for(let i=0;i<values.length;i++){
+      if(String(values[i][0])===id){
+        const row=i+2;
+        const now=Utilities.formatDate(new Date(),TIME_ZONE,'yyyy-MM-dd HH:mm:ss');
+        sheet.getRange(row,7).setValue(next);
+        sheet.getRange(row,9).setValue(now);
+        sheet.getRange(row,10).setValue(next==='COMPLETED'?now:'');
+        return {ok:true,status:next,message:next==='COMPLETED'?'Follow-up marked completed.':next==='CANCELLED'?'Follow-up cancelled.':'Follow-up reopened.'};
+      }
+    }
+    throw new Error('Follow-up record not found. Refresh the list and try again.');
+  } finally {lock.releaseLock();}
 }
 
 function adminSavePatientRecord(token, patientId, payload) {
