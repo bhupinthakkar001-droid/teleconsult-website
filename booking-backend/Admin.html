@@ -327,7 +327,7 @@ function renderEmrPatientList(){
   }
   root.innerHTML=emrPatients.map(p=>{
     const alert=p.allergies?'<small>Allergies: '+esc(p.allergies)+'</small>':'<small>No allergy details recorded</small>';
-    return '<button type="button" class="emr-person '+(p.patientId===selectedEmrPatientId?'active':'')+'" onclick="openEmrPatient(\\''+esc(p.patientId)+'\\')">'+
+    return '<button type="button" class="emr-person '+(p.patientId===selectedEmrPatientId?'active':'')+'" onclick="openEmrPatient(\''+esc(p.patientId)+'\')">'+
       '<strong>'+esc(p.patientName)+'</strong><small>'+esc(p.phone)+' · '+esc(p.patientId)+'</small>'+alert+
       (p.chronicConditions?'<small>Conditions: '+esc(p.chronicConditions)+'</small>':'')+'</button>';
   }).join('');
@@ -358,7 +358,7 @@ function openEmrPatient(patientId){
       r.patient.allergies?'Allergies: '+r.patient.allergies:'',
       r.patient.allergyReaction?'Reaction: '+r.patient.allergyReaction:'',
       r.patient.clinicalAlerts?'Clinical alerts: '+r.patient.clinicalAlerts:''
-    ].filter(Boolean).join('\\n');
+    ].filter(Boolean).join('\n');
     const alertBox=document.getElementById('emrAlerts');
     alertBox.textContent=alertText;
     alertBox.classList.toggle('hidden',!alertText);
@@ -374,7 +374,7 @@ function renderEmrPrescriptions(items){
   const root=document.getElementById('emrPrescriptionList');
   if(!items.length){root.innerHTML='<div class="muted">No prescriptions saved in this EMR yet.</div>';return;}
   root.innerHTML=items.map(x=>{
-    const meds=(x.medicines||[]).map(m=>m.name+' — '+m.dose+' — '+m.instructions).join('\\n');
+    const meds=(x.medicines||[]).map(m=>m.name+' — '+m.dose+' — '+m.instructions).join('\n');
     return '<article class="emr-rx"><strong>'+esc(x.prescriptionDate||x.createdAt)+' · '+esc(x.assessment||'Prescription')+'</strong>'+
       '<p>'+esc(meds)+'</p>'+
       (x.advice?'<p><strong>Advice:</strong> '+esc(x.advice)+'</p>':'')+
