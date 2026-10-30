@@ -621,3 +621,126 @@ function processAdminRequest_(requestId, approve) {
     lock.releaseLock();
   }
 }
+
+
+/* ---------------- MOBILE SLOT MANAGEMENT ----------------
+   Only AVAILABLE slots can be edited or removed. PENDING and
+   CONFIRMED slots are locked to protect patient appointments.
+*/
+function adminGetSlots(token) {
+  requireAdminSession_(token);
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(SLOTS_SHEET);
+  if (!sheet || sheet.getLastRow() < 2) return {slots:[]};
+  const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, 8).getDisplayValues();
+  const today = todayString_();
+  const result = [];
+  rows.forEach(function(r) {
+    const date = String(r[1] || '').trim();
+    const status = String(r[3] || '').trim().toUpperCase();
+    if (r[0] && date >= today && ['AVAILABLE','PENDING','CONFIRMED'].includes(status)) {
+      result.push({slotId:String(r[0]), date:date, time:String(r[2] || ''), status:status});
+    }
+  });
+  result.sort(function(a,b) {
+    return a.date === b.date ? toMinutes_(a.time) - toMinutes_(b.time) : a.date.localeCompare(b.date);
+  });
+  return {slots:result};
+}
+
+function adminAddSlot(token, dateValue, timeValue) {
+  requireAdminSession_(token);
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const input = validateAdminSlotInput_(dateValue, timeValue);
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SLOTS_SHEET);
+    if (!sheet) throw new Error('Slots sheet was not found.');
+    ensureNoDuplicateSlot_(sheet, input.date, input.minutes, '');
+    const slotId = 'S' + Utilities.getUuid().replace(/-/g, '').slice(0, 10).toUpperCase();
+    sheet.appendRow([slotId, input.date, input.time, 'AVAILABLE', '', '', '', '']);
+    const row = sheet.getLastRow();
+    sheet.getRange(row, 1, 1, 3).setNumberFormat('@');
+    return {ok:true, message:'Appointment slot added.'};
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function adminUpdateSlot(token, slotId, dateValue, timeValue) {
+  requireAdminSession_(token);
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const input = validateAdminSlotInput_(dateValue, timeValue);
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SLOTS_SHEET);
+    if (!sheet || sheet.getLastRow() < 2) throw new Error('No appointment slots were found.');
+    const rows = sheet.getDataRange().getDisplayValues();
+    let row = -1;
+    for (let i = 1; i < rows.length; i++) {
+      if (String(rows[i][0]) === String(slotId)) { row = i + 1; break; }
+    }
+    if (row < 0) throw new Error('This slot could not be found. Refresh the dashboard.');
+    const status = String(sheet.getRange(row, 4).getDisplayValue()).toUpperCase();
+    if (status !== 'AVAILABLE') throw new Error('Only available slots can be edited. Booked slots are locked.');
+    ensureNoDuplicateSlot_(sheet, input.date, input.minutes, String(slotId));
+    sheet.getRange(row, 2, 1, 2).setNumberFormat('@');
+    sheet.getRange(row, 2, 1, 2).setValues([[input.date, input.time]]);
+    return {ok:true, message:'Appointment slot updated.'};
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function adminDeleteSlot(token, slotId) {
+  requireAdminSession_(token);
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SLOTS_SHEET);
+    if (!sheet || sheet.getLastRow() < 2) throw new Error('No appointment slots were found.');
+    const rows = sheet.getDataRange().getDisplayValues();
+    let row = -1;
+    for (let i = 1; i < rows.length; i++) {
+      if (String(rows[i][0]) === String(slotId)) { row = i + 1; break; }
+    }
+    if (row < 0) throw new Error('This slot could not be found. Refresh the dashboard.');
+    const status = String(sheet.getRange(row, 4).getDisplayValue()).toUpperCase();
+    if (status !== 'AVAILABLE') throw new Error('Only available slots can be removed. Booked slots are locked.');
+    // Retain the row for audit/history; public availability ignores REMOVED slots.
+    sheet.getRange(row, 4).setValue('REMOVED');
+    return {ok:true, message:'Appointment slot removed.'};
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function validateAdminSlotInput_(dateValue, timeValue) {
+  const date = String(dateValue || '').trim();
+  const rawTime = String(timeValue || '').trim();
+  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date)) throw new Error('Please choose a valid appointment date.');
+  if (!/^([01]\\d|2[0-3]):[0-5]\\d$/.test(rawTime)) throw new Error('Please choose a valid appointment time.');
+  const start = parseAppointmentDateTime_(date, rawTime);
+  if (start.getTime() <= Date.now()) throw new Error('Please choose a future date and time.');
+  const parts = rawTime.split(':');
+  const hour = Number(parts[0]);
+  const minute = parts[1];
+  const suffix = hour >= 12 ? 'PM' : 'AM';
+  const hour12 = hour % 12 || 12;
+  return {date:date, time:hour12 + ':' + minute + ' ' + suffix, minutes:hour * 60 + Number(minute)};
+}
+
+function ensureNoDuplicateSlot_(sheet, date, minutes, exceptSlotId) {
+  if (sheet.getLastRow() < 2) return;
+  const rows = sheet.getDataRange().getDisplayValues();
+  for (let i = 1; i < rows.length; i++) {
+    const id = String(rows[i][0] || '');
+    const rowDate = String(rows[i][1] || '').trim();
+    const status = String(rows[i][3] || '').trim().toUpperCase();
+    if (id && id !== exceptSlotId && rowDate === date &&
+        ['AVAILABLE','PENDING','CONFIRMED'].includes(status) &&
+        toMinutes_(rows[i][2]) === minutes) {
+      throw new Error('A slot already exists at this date and time.');
+    }
+  }
+}
