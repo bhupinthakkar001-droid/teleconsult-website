@@ -1192,53 +1192,35 @@ function adminSaveConsultation(token, requestId, payload, requestedStatus) {
    Transfers only a short-lived, single-use payload to the authenticated
    prescription app. No patient details are placed in the URL.
 */
-function adminCreatePrescriptionHandoff(token, requestId, formPayload) {
+function adminCreatePrescriptionHandoff(token, requestId) {
   requireAdminSession_(token);
   const booking = findConfirmedBookingForConsultation_(cleanText_(requestId,80));
   if (!/\b(test|fictional|demo)\b/i.test(booking.patientName)) {
     throw new Error('The connected AI Clinic app is a test-only prototype. For safety, handoff is restricted to a clearly labelled fictional/demo booking. Real patient information cannot be transferred.');
   }
-  const p = formPayload || {};
-  const field = function(key, limit) {
-    return cleanMultilineText_(p[key] || '', limit);
-  };
-  const clinicalParts = [
-    booking.presentingComplaint ? 'Presenting complaint: ' + booking.presentingComplaint : '',
-    booking.medicalHistory ? 'Past medical history: ' + booking.medicalHistory : '',
-    field('clinicalHistory',5000) ? 'Clinical history: ' + field('clinicalHistory',5000) : '',
-    field('examination',3000) ? 'Examination / video assessment: ' + field('examination',3000) : '',
-    field('bloodPressure',50) ? 'Blood pressure: ' + field('bloodPressure',50) : '',
-    field('pulse',30) ? 'Pulse: ' + field('pulse',30) : '',
-    field('respiratoryRate',30) ? 'Respiratory rate: ' + field('respiratoryRate',30) : '',
-    field('temperature',30) ? 'Temperature: ' + field('temperature',30) : '',
-    field('spo2',30) ? 'SpO2: ' + field('spo2',30) : '',
-    field('investigations',2000) ? 'Relevant investigations: ' + field('investigations',2000) : ''
-  ].filter(Boolean);
   const now = new Date();
   const handoff = {
     patient: {
       name: cleanText_(booking.patientName,80),
-      age: cleanText_(p.age,3),
-      sex: cleanText_(p.sex,30),
-      weight: cleanText_(p.weight,10)
+      phone: normalizeWhatsAppPhone_(booking.patientPhone),
+      age: '',
+      sex: '',
+      weight: ''
     },
     clinic: 'Dr. Bhupin Thakkar | Online Consultation',
     doctor: 'Dr. Bhupin Thakkar, MBBS, DNB (Internal Medicine)',
     prescriptionDate: Utilities.formatDate(now,TIME_ZONE,'yyyy-MM-dd'),
     prescriptionTime: Utilities.formatDate(now,TIME_ZONE,'HH:mm'),
-    clinical: clinicalParts.join('\n'),
-    assessment: field('assessmentDiagnosis',2000),
-    history: [
-      field('currentMedicines',2000),
-      booking.medicalHistory
+    clinical: [
+      booking.presentingComplaint ? 'Presenting complaint: ' + booking.presentingComplaint : '',
+      booking.medicalHistory ? 'Past medical history: ' + booking.medicalHistory : ''
     ].filter(Boolean).join('\n'),
-    allergies: field('allergies',1000),
-    advice: field('treatmentPlan',4000),
-    investigations: field('investigations',2000),
-    followup: [
-      field('followUpAdvice',2000),
-      field('followUpDate',20) ? 'Follow-up date: ' + field('followUpDate',20) : ''
-    ].filter(Boolean).join('\n')
+    assessment: '',
+    history: booking.medicalHistory || '',
+    allergies: '',
+    advice: '',
+    investigations: '',
+    followup: ''
   };
   const cache = CacheService.getScriptCache();
   const handoffToken = Utilities.getUuid().replace(/-/g,'') + Utilities.getUuid().replace(/-/g,'');
