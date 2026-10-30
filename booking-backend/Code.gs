@@ -4,7 +4,8 @@ const REQUESTS_SHEET = 'Requests';
 const REQUEST_HEADERS = [
   'requestId', 'slotId', 'date', 'time',
   'patientName', 'patientPhone', 'visitType', 'status',
-  'requestedAt', 'decisionAt', 'videoLink', 'calendarEventId'
+  'requestedAt', 'decisionAt', 'videoLink', 'calendarEventId',
+  'presentingComplaint', 'medicalHistory', 'onlineConsultConsent', 'consentAt'
 ];
 
 function onOpen() {
@@ -54,6 +55,7 @@ function setupBookingSystem() {
   } else {
     requests.getRange(1, 11).setValue('videoLink');
     requests.getRange(1, 12).setValue('calendarEventId');
+    ensureIntakeColumns_(requests);
   }
 
   slots.setFrozenRows(1);
@@ -65,6 +67,7 @@ function setupBookingSystem() {
   slots.getRange('A:C').setNumberFormat('@');
   slots.getRange('E:F').setNumberFormat('@');
   requests.getRange('A:F').setNumberFormat('@');
+  requests.getRange('M:P').setNumberFormat('@');
   SpreadsheetApp.getUi().alert('Setup complete. Your existing booking rows have been preserved.');
 }
 
@@ -98,12 +101,17 @@ function doPost(e) {
   const phoneDigits = phone.replace(/\D/g, '');
   const slotId = cleanText_(p.slotId, 80);
   const visitType = cleanText_(p.visitType, 40);
+  const presentingComplaint = cleanMultilineText_(p.presentingComplaint, 1000);
+  const medicalHistory = cleanMultilineText_(p.medicalHistory, 1000);
+  const consentGiven = String(p.onlineConsultConsent || '') === 'yes';
   const doctorWhatsApp = PropertiesService.getScriptProperties().getProperty('DOCTOR_WHATSAPP') || '';
 
   if (name.length < 2) return receiptPage_('Check your name', 'Please enter your full name and try again.', '');
   if (phoneDigits.length < 10 || phoneDigits.length > 15) return receiptPage_('Check your mobile number', 'Please enter a valid mobile number and try again.', '');
   if (!slotId) return receiptPage_('Choose an appointment time', 'Please return to the website and choose an available time.', '');
   if (!['First consultation', 'Follow-up consultation'].includes(visitType)) return receiptPage_('Choose appointment type', 'Please choose first consultation or follow-up.', '');
+  if (presentingComplaint.length < 3) return receiptPage_('Add your presenting problem', 'Please briefly describe what you are consulting about and how long you have had it.', '');
+  if (!consentGiven) return receiptPage_('Consent required', 'Please confirm your consent to an online consultation before submitting.', '');
   if (!/^\d{10,15}$/.test(doctorWhatsApp)) return receiptPage_('Booking setup incomplete', 'The doctor is still setting up WhatsApp confirmation. Please try again later.', '');
 
   const lock = LockService.getScriptLock();
@@ -115,6 +123,7 @@ function doPost(e) {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     sheet = ss.getSheetByName(SLOTS_SHEET);
     const requests = ss.getSheetByName(REQUESTS_SHEET);
+    if (requests) ensureIntakeColumns_(requests);
     if (!sheet || !requests || sheet.getLastRow() < 2) {
       return receiptPage_('No appointment slots available', 'Please check again later or contact the doctor.', '');
     }
@@ -144,7 +153,8 @@ function doPost(e) {
 
     requests.appendRow([
       requestId, slotId, String(chosen[1]), String(chosen[2]),
-      safeCell_(name), safeCell_(phone), visitType, 'PENDING', now, '', '', ''
+      safeCell_(name), safeCell_(phone), visitType, 'PENDING', now, '', '', '',
+      safeCell_(presentingComplaint), safeCell_(medicalHistory), 'YES', now
     ]);
 
     const msg = [
@@ -449,6 +459,19 @@ function cleanText_(value, maxLength) {
   return String(value || '').replace(/[<>\u0000-\u001F]/g, '').trim().slice(0, maxLength);
 }
 
+function cleanMultilineText_(value, maxLength) {
+  return String(value || '').replace(/[<>]/g, '').replace(/\r\n?/g, '\n')
+    .replace(/[\u0000-\u0009\u000B-\u001F]/g, '').trim().slice(0, maxLength);
+}
+
+function ensureIntakeColumns_(sheet) {
+  sheet.getRange(1, 13, 1, 4).setValues([[
+    'presentingComplaint', 'medicalHistory', 'onlineConsultConsent', 'consentAt'
+  ]]);
+  sheet.getRange(1, 13, 1, 4).setFontWeight('bold');
+  sheet.getRange('M:P').setNumberFormat('@');
+}
+
 function cleanPhone_(value) {
   return String(value || '').replace(/[^0-9 +]/g, '').trim().slice(0, 18);
 }
@@ -568,11 +591,13 @@ function adminGetRequests(token) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName(REQUESTS_SHEET);
   if (!sheet || sheet.getLastRow() < 2) return {pending:[], confirmed:[]};
+  ensureIntakeColumns_(sheet);
   const rows = sheet.getRange(2, 1, sheet.getLastRow()-1, REQUEST_HEADERS.length).getDisplayValues();
   const pending = [], confirmed = [];
   rows.forEach((r, i) => {
     const item = {row:i+2, requestId:r[0], date:r[2], time:r[3], patientName:r[4],
-      patientPhone:r[5], visitType:r[6], status:r[7], videoLink:r[10]};
+      patientPhone:r[5], visitType:r[6], status:r[7], videoLink:r[10],
+      presentingComplaint:r[12], medicalHistory:r[13], onlineConsultConsent:r[14], consentAt:r[15]};
     if (r[7] === 'PENDING') pending.push(item);
     if (r[7] === 'CONFIRMED') confirmed.push(item);
   });
