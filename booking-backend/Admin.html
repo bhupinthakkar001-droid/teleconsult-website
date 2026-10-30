@@ -36,32 +36,6 @@
     .priority-card{border:2px solid #d18b32;background:#fffdf8}
     .priority-label{display:inline-flex;align-items:center;background:#fff0d5;color:#89520b;border-radius:99px;padding:5px 10px;font-size:11px;font-weight:800}
     .priority-meta{color:#89520b;font-size:13px;font-weight:750;margin:7px 0}
-    .consult-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 12px}
-    .consult-field{min-width:0}.consult-field.full{grid-column:1/-1}
-    .consult-field label{display:block;font-size:13px;font-weight:700;margin-top:7px}
-    .consult-field input,.consult-field textarea,.consult-field select{width:100%;padding:11px;border:1px solid var(--line);border-radius:10px;font:inherit;margin:6px 0 10px;background:white}
-    .consult-field textarea{min-height:84px;resize:vertical}
-    .consult-summary{background:#f5f8f5;border:1px solid var(--line);padding:12px;border-radius:12px;margin:10px 0 14px}
-    .consult-generator{background:#f8faf8;border:1px solid var(--line);padding:14px;border-radius:14px;margin:14px 0}
-    .consult-generator .row{margin-top:10px}
-    .consult-status{font-size:13px;color:var(--green);margin:8px 0}
-    .consult-mobile-help{font-size:12px;line-height:1.5;color:var(--muted);background:#f5f8f5;border:1px solid var(--line);padding:11px 12px;border-radius:12px;margin:10px 0}
-    .consult-mobile-actions{position:sticky;bottom:0;z-index:4;background:rgba(255,255,255,.97);backdrop-filter:blur(8px);padding:10px 0 calc(10px + env(safe-area-inset-bottom));border-top:1px solid var(--line);box-shadow:0 -5px 16px #19362d0c}
-    .consult-mobile-actions button{min-height:46px}
-    .consult-generator .row{align-items:stretch}
-    @media(max-width:600px){
-      .wrap{padding:10px 9px calc(28px + env(safe-area-inset-bottom))}
-      .consult-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:0 8px}
-      .consult-field.full{grid-column:1/-1}
-      .consult-field input,.consult-field textarea,.consult-field select{font-size:16px;padding:10px 9px}
-      .consult-field textarea{min-height:74px}
-      .consult-mobile-actions{margin:12px -9px 0;padding:10px 9px calc(10px + env(safe-area-inset-bottom));}
-      .consult-mobile-actions button{padding:11px 8px;font-size:12px;min-width:0}
-      .consult-generator .row{flex-direction:column}
-      .consult-generator .row>*{width:100%;flex:none}
-    }
-    @media(max-width:360px){.consult-grid{grid-template-columns:1fr}.consult-field.full{grid-column:auto}.consult-mobile-actions{flex-direction:column}}
-    @media(max-width:520px){.consult-grid{grid-template-columns:1fr}.consult-field.full{grid-column:auto}}
     @media(max-width:420px){.slot-grid{grid-template-columns:1fr}.slot-form-actions{flex-direction:column}}
   </style>
 </head>
@@ -112,59 +86,10 @@
       <div id="slotList"></div>
       <button class="secondary full" type="button" onclick="loadSlots()">Refresh slots</button>
     </section>
-    <section id="consultationPanel" class="hidden">
-      <div class="card">
-        <div class="row" style="justify-content:space-between;align-items:center">
-          <div><h2>Consultation workspace</h2><div class="muted">Private clinical note linked to this confirmed appointment</div></div>
-          <button class="secondary" type="button" onclick="closeConsultation()">Back</button>
-        </div>
-        <div id="consultationPatientSummary" class="consult-summary"></div>
-        <div id="consultationMeetAction" class="row" style="margin:8px 0 12px"></div>
-        <div id="consultationNotice" class="consult-status">Loading consultation record…</div>
-        <details class="consult-mobile-help">
-          <summary><strong>Using this workspace on your phone</strong></summary>
-          <p><strong>Android:</strong> Open Meet from the button above. Then open Recent apps, tap the Meet app icon and choose Split screen (wording varies by phone). Select Chrome for the other half. Turn the phone sideways for more room. On Pixel phones, Google documents the Recent apps → app icon → Split screen steps.</p>
-          <p><strong>Most standard iPhones:</strong> Keep Meet and notes in separate apps and switch between them; normal iPhones do not provide Android-style two-app split screen. iPhone Duo has a dedicated Split View feature.</p>
-        </details>
-        <div class="consult-grid">
-          <div class="consult-field"><label for="consultAge">Age</label><input id="consultAge" type="number" min="0" max="120" inputmode="numeric" placeholder="Age in years"></div>
-          <div class="consult-field"><label for="consultSex">Sex</label><select id="consultSex"><option value="">Not recorded</option><option>Female</option><option>Male</option><option>Other</option></select></div>
-          <div class="consult-field full"><label for="consultAllergies">Known allergies</label><textarea id="consultAllergies" placeholder="Drug / food allergies or no known allergies"></textarea></div>
-          <div class="consult-field full"><label for="consultMedicines">Current medicines</label><textarea id="consultMedicines" placeholder="Medicine, dose and frequency, if known"></textarea></div>
-          <div class="consult-field"><label for="consultBP">Blood pressure</label><input id="consultBP" placeholder="e.g. 120/80 mmHg"></div>
-          <div class="consult-field"><label for="consultPulse">Pulse</label><input id="consultPulse" placeholder="beats/min"></div>
-          <div class="consult-field"><label for="consultRR">Respiratory rate</label><input id="consultRR" placeholder="breaths/min"></div>
-          <div class="consult-field"><label for="consultTemp">Temperature</label><input id="consultTemp" placeholder="°C"></div>
-          <div class="consult-field"><label for="consultSpO2">SpO₂</label><input id="consultSpO2" placeholder="% (mention oxygen if applicable)"></div>
-          <div class="consult-field"><label for="consultWeight">Weight</label><input id="consultWeight" placeholder="kg"></div>
-          <div class="consult-field"><label for="consultHeight">Height</label><input id="consultHeight" placeholder="cm"></div>
-          <div class="consult-field full"><label for="consultHistory">Clinical history</label><textarea id="consultHistory" style="min-height:110px" placeholder="Relevant history, symptoms, onset, duration and review of systems"></textarea></div>
-          <div class="consult-field full"><label for="consultExam">Examination / video assessment</label><textarea id="consultExam" placeholder="Relevant examination and limitations of remote assessment"></textarea></div>
-          <div class="consult-field full"><label for="consultDiagnosis">Assessment / diagnosis</label><textarea id="consultDiagnosis" placeholder="Clinical assessment and differential diagnosis, as appropriate"></textarea></div>
-          <div class="consult-field full"><label for="consultInvestigations">Investigations advised</label><textarea id="consultInvestigations" placeholder="Tests, imaging or reports requested"></textarea></div>
-          <div class="consult-field full"><label for="consultPlan">Treatment plan</label><textarea id="consultPlan" style="min-height:110px" placeholder="Treatment, advice and safety-net instructions"></textarea></div>
-          <div class="consult-field full"><label for="consultFollowup">Follow-up advice</label><textarea id="consultFollowup" placeholder="When to follow up and when in-person / emergency evaluation is needed"></textarea></div>
-          <div class="consult-field"><label for="consultFollowupDate">Follow-up date (optional)</label><input id="consultFollowupDate" type="date"></div>
-        </div>
-        <div class="row consult-mobile-actions" style="margin-top:10px">
-          <button class="secondary" id="saveConsultationBtn" type="button" onclick="saveConsultation('DRAFT')">Save draft</button>
-          <button class="primary" id="completeConsultationBtn" type="button" onclick="saveConsultation('COMPLETED')">Mark consultation completed</button>
-        </div>
-        <div class="consult-generator">
-          <strong>Prescription generator</strong>
-          <div class="muted">Save the consultation draft, then create a one-time, 3-minute handoff to prefill your prescription app. The handoff uses a short-lived token; patient details are not placed in the URL. TEST-ONLY: only a clearly labelled fictional/demo booking can be transferred.</div>
-          <div class="row">
-            <button class="primary" type="button" onclick="openPrescriptionGeneratorWithPatient()">Open generator with consultation details</button>
-            <a class="action secondary" href="https://ai-clinic-app-mu3y.onrender.com/" target="_blank" rel="noopener">Open blank generator</a>
-            <button class="secondary" type="button" onclick="copyPrescriptionContext()">Copy details</button>
-          </div>
-        </div>
-      </div>
-    </section>
   </section>
 </div>
 <script>
-let sessionToken='', currentTab='pending', data={pending:[],confirmed:[]}, slotsData=[], editingSlotId='', changeRequests=[], priorityEnabled=true, currentConsultationBooking=null;
+let sessionToken='', currentTab='pending', data={pending:[],confirmed:[]}, slotsData=[], editingSlotId='', changeRequests=[], priorityEnabled=true;
 function showError(id,msg){document.getElementById(id).textContent=msg||''}
 function login(){
   const btn=document.getElementById('loginBtn');btn.disabled=true;btn.textContent='Signing in…';showError('loginError','');
@@ -219,9 +144,6 @@ function togglePriorityBookings(){
   }).adminSetPriorityBookingsEnabled(sessionToken,next);
 }
 function showTab(tab){
-  document.getElementById('consultationPanel').classList.add('hidden');
-  document.querySelector('.tabs').classList.remove('hidden');
-  document.getElementById('priorityControl').classList.remove('hidden');
   currentTab=tab;
   document.getElementById('pendingTab').classList.toggle('active',tab==='pending');
   document.getElementById('confirmedTab').classList.toggle('active',tab==='confirmed');
@@ -266,13 +188,13 @@ function render(){
       const msg=confirmationMessage(x);
       const wa='https://wa.me/'+phone+'?text='+encodeURIComponent(msg);
       actions='<div class="row" style="margin-top:14px">'+
-        '<button class="primary" type="button" onclick="openConsultation(\''+esc(x.requestId)+'\')">Open consultation</button>'+
+        '<button class="primary" type="button" onclick="openPrescriptionGeneratorWithBooking(\''+esc(x.requestId)+'\')">Create prescription</button>'+
         '<a class="action primary" target="_blank" rel="noopener" href="'+esc(x.videoLink)+'">Open Google Meet</a>'+
         '<a class="action whatsapp" target="_blank" rel="noopener" href="'+esc(wa)+'">Send WhatsApp</a>'+
         '<button class="secondary" type="button" onclick="copySms(\''+esc(x.requestId)+'\')">Copy SMS message</button>'+
         '</div>';
     } else if(currentTab==='confirmed') {
-      actions='<div class="row" style="margin-top:14px"><button class="primary" type="button" onclick="openConsultation(\''+esc(x.requestId)+'\')">Open consultation</button></div><p class="meta">Meet link is not available for this appointment. Please check the Requests sheet.</p>';
+      actions='<div class="row" style="margin-top:14px"><button class="primary" type="button" onclick="openPrescriptionGeneratorWithBooking(\''+esc(x.requestId)+'\')">Create prescription</button></div><p class="meta">Meet link is not available for this appointment. Please check the Requests sheet.</p>';
     } else {
       const approveText=isPriority?'Accept priority & create Meet':'Approve & create Meet';
       actions='<div class="row" style="margin-top:14px"><button class="primary" onclick="decide(\''+esc(x.requestId)+'\',true)">'+approveText+'</button><button class="danger" onclick="decide(\''+esc(x.requestId)+'\',false)">Decline</button></div>';
@@ -288,142 +210,31 @@ function render(){
   }).join('');
 }
 
-const consultationFields = {
-  age:'consultAge', sex:'consultSex', allergies:'consultAllergies',
-  currentMedicines:'consultMedicines', bloodPressure:'consultBP', pulse:'consultPulse',
-  respiratoryRate:'consultRR', temperature:'consultTemp', spo2:'consultSpO2',
-  weight:'consultWeight', height:'consultHeight', clinicalHistory:'consultHistory',
-  examination:'consultExam', assessmentDiagnosis:'consultDiagnosis',
-  investigations:'consultInvestigations', treatmentPlan:'consultPlan',
-  followUpAdvice:'consultFollowup', followUpDate:'consultFollowupDate'
-};
-function openConsultation(requestId){
+function openPrescriptionGeneratorWithBooking(requestId){
   const booking=(data.confirmed||[]).find(x=>String(x.requestId)===String(requestId));
-  if(!booking){document.getElementById('notice').textContent='Refresh confirmed appointments and try again.';return;}
-  document.querySelector('.tabs').classList.add('hidden');
-  document.getElementById('priorityControl').classList.add('hidden');
-  document.getElementById('requestList').classList.add('hidden');
-  document.getElementById('requestRefresh').classList.add('hidden');
-  document.getElementById('changePanel').classList.add('hidden');
-  document.getElementById('slotPanel').classList.add('hidden');
-  document.getElementById('consultationPanel').classList.remove('hidden');
-  document.getElementById('consultationNotice').textContent='Loading saved clinical note…';
-  document.getElementById('consultationPatientSummary').textContent=
-    booking.patientName+' · '+booking.patientPhone+' · '+booking.date+' at '+booking.time+
-    ' · '+booking.visitType+' · Request '+booking.requestId+
-    (booking.presentingComplaint?' · Presenting problem: '+booking.presentingComplaint:'');
-  document.getElementById('consultationMeetAction').innerHTML=booking.videoLink
-    ? '<a class="action primary" href="'+esc(booking.videoLink)+'" target="_blank" rel="noopener">Open Google Meet in new tab</a>'
-    : '<span class="muted">No Google Meet link is attached to this appointment.</span>';
-  currentConsultationBooking=booking;
-  Object.values(consultationFields).forEach(id=>{document.getElementById(id).value='';});
-  google.script.run.withSuccessHandler(r=>{
-    if(!r || !r.ok) {document.getElementById('consultationNotice').textContent='Could not load this consultation record.';return;}
-    currentConsultationBooking=r.booking||booking;
-    const saved=r.consultation||{};
-    Object.keys(consultationFields).forEach(key=>{
-      document.getElementById(consultationFields[key]).value=saved[key]||'';
-    });
-    document.getElementById('consultationNotice').textContent=
-      saved.noteStatus==='COMPLETED'?'Saved record · Marked completed'+(saved.updatedAt?' · '+saved.updatedAt:''):
-      saved.updatedAt?'Saved draft · Last updated '+saved.updatedAt:'New consultation note · Not yet saved';
-  }).withFailureHandler(e=>{
-    document.getElementById('consultationNotice').textContent=e.message||String(e);
-  }).adminGetConsultation(sessionToken,requestId);
-}
-function closeConsultation(){
-  currentConsultationBooking=null;
-  showTab('confirmed');
-}
-function saveConsultation(status){
-  if(!currentConsultationBooking){document.getElementById('consultationNotice').textContent='No appointment is selected.';return;}
-  const payload={};
-  Object.keys(consultationFields).forEach(key=>{
-    payload[key]=document.getElementById(consultationFields[key]).value||'';
-  });
-  const draftBtn=document.getElementById('saveConsultationBtn');
-  const completeBtn=document.getElementById('completeConsultationBtn');
-  draftBtn.disabled=true;completeBtn.disabled=true;
-  document.getElementById('consultationNotice').textContent='Saving clinical note…';
-  google.script.run.withSuccessHandler(r=>{
-    draftBtn.disabled=false;completeBtn.disabled=false;
-    document.getElementById('consultationNotice').textContent=r.message+' Updated: '+r.updatedAt;
-  }).withFailureHandler(e=>{
-    draftBtn.disabled=false;completeBtn.disabled=false;
-    document.getElementById('consultationNotice').textContent=e.message||String(e);
-  }).adminSaveConsultation(sessionToken,currentConsultationBooking.requestId,payload,status);
-}
-
-function openPrescriptionGeneratorWithPatient(){
-  if(!currentConsultationBooking){
-    document.getElementById('consultationNotice').textContent='Open a confirmed appointment first.';
+  if(!booking){
+    document.getElementById('notice').textContent='Refresh confirmed appointments and try again.';
     return;
   }
   const popup=window.open('about:blank','_blank');
   if(!popup){
-    document.getElementById('consultationNotice').textContent='Your browser blocked the new tab. Allow pop-ups for the doctor dashboard and try again.';
+    document.getElementById('notice').textContent='Your browser blocked the new tab. Allow pop-ups for the doctor dashboard and try again.';
     return;
   }
-  try{popup.document.write('<p style="font:16px system-ui;padding:24px">Saving consultation and preparing prescription workspace…</p>');}catch(e){}
-  const payload={};
-  Object.keys(consultationFields).forEach(key=>{
-    payload[key]=document.getElementById(consultationFields[key]).value||'';
-  });
-  document.getElementById('consultationNotice').textContent='Saving consultation draft before creating the one-time handoff…';
-  google.script.run.withSuccessHandler(saved=>{
-    google.script.run.withSuccessHandler(r=>{
-      if(!r || !r.ok || !r.token){
-        try{popup.close();}catch(e){}
-        document.getElementById('consultationNotice').textContent='Could not create the prescription handoff. Your consultation draft was saved.';
-        return;
-      }
-      popup.location.href='https://ai-clinic-app-mu3y.onrender.com/?handoff='+encodeURIComponent(r.token);
-      document.getElementById('consultationNotice').textContent='Consultation draft saved. Prescription app opened; its one-time handoff expires in 3 minutes.';
-    }).withFailureHandler(e=>{
-      try{popup.close();}catch(err){}
-      document.getElementById('consultationNotice').textContent=e.message||String(e);
-    }).adminCreatePrescriptionHandoff(sessionToken,currentConsultationBooking.requestId,payload);
+  try{popup.document.write('<p style="font:16px system-ui;padding:24px">Opening prescription software…</p>');}catch(e){}
+  document.getElementById('notice').textContent='Preparing secure, one-time prescription handoff…';
+  google.script.run.withSuccessHandler(r=>{
+    if(!r || !r.ok || !r.token){
+      try{popup.close();}catch(e){}
+      document.getElementById('notice').textContent='Could not create the prescription handoff.';
+      return;
+    }
+    popup.location.href='https://ai-clinic-app-mu3y.onrender.com/?handoff='+encodeURIComponent(r.token);
+    document.getElementById('notice').textContent='Prescription software opened. Handoff expires in 3 minutes.';
   }).withFailureHandler(e=>{
     try{popup.close();}catch(err){}
-    document.getElementById('consultationNotice').textContent='Could not save the consultation draft: '+(e.message||String(e));
-  }).adminSaveConsultation(sessionToken,currentConsultationBooking.requestId,payload,'DRAFT');
-}
-function copyPrescriptionContext(){
-  if(!currentConsultationBooking)return;
-  const b=currentConsultationBooking;
-  const labels={
-    age:'Age',sex:'Sex',allergies:'Allergies',currentMedicines:'Current medicines',
-    bloodPressure:'Blood pressure',pulse:'Pulse',respiratoryRate:'Respiratory rate',
-    temperature:'Temperature',spo2:'SpO2',weight:'Weight',height:'Height',
-    clinicalHistory:'Clinical history',examination:'Examination / video assessment',
-    assessmentDiagnosis:'Assessment / diagnosis',investigations:'Investigations',
-    treatmentPlan:'Treatment plan',followUpAdvice:'Follow-up advice',followUpDate:'Follow-up date'
-  };
-  const output=[
-    'Patient: '+(b.patientName||''),
-    'Appointment: '+(b.appointmentDate||b.date||'')+' '+(b.appointmentTime||b.time||''),
-    'Consultation type: '+(b.visitType||''),
-    'Presenting complaint: '+(b.presentingComplaint||''),
-    'Past medical history: '+(b.medicalHistory||'')
-  ];
-  Object.keys(consultationFields).forEach(key=>{
-    const value=String(document.getElementById(consultationFields[key]).value||'').trim();
-    if(value)output.push(labels[key]+': '+value);
-  });
-  copyClinicalText(output.join('\n'));
-}
-function copyClinicalText(value){
-  const fallback=()=>{
-    const area=document.createElement('textarea');area.value=value;area.style.position='fixed';area.style.opacity='0';document.body.appendChild(area);area.focus();area.select();
-    try{document.execCommand('copy');document.getElementById('consultationNotice').textContent='Consultation details copied. Paste them into the prescription generator and verify every field before issuing.';}
-    catch(e){document.getElementById('consultationNotice').textContent='Copy failed. Please select and copy the details manually.';}
-    area.remove();
-  };
-  if(navigator.clipboard&&navigator.clipboard.writeText){
-    navigator.clipboard.writeText(value).then(()=>{
-      document.getElementById('consultationNotice').textContent='Consultation details copied. Paste them into the prescription generator and verify every field before issuing.';
-    }).catch(fallback);
-  }else fallback();
+    document.getElementById('notice').textContent=e.message||String(e);
+  }).adminCreatePrescriptionHandoff(sessionToken,requestId);
 }
 
 function loadChangeRequests(){
