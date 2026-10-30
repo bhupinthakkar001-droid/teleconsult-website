@@ -152,10 +152,11 @@
         </div>
         <div class="consult-generator">
           <strong>Prescription generator</strong>
-          <div class="muted">Open your existing prescription app in a separate tab. Copy the consultation details here, then paste the relevant information into the generator. Patient details are not sent to the generator automatically.</div>
+          <div class="muted">Create a one-time, 3-minute handoff to prefill your existing prescription app. The handoff uses a short-lived token; patient details are not placed in the URL. The prescription app remains a TEST-ONLY prototype.</div>
           <div class="row">
-            <a class="action primary" href="https://ai-clinic-app-mu3y.onrender.com/" target="_blank" rel="noopener">Open prescription generator</a>
-            <button class="secondary" type="button" onclick="copyPrescriptionContext()">Copy details for prescription</button>
+            <button class="primary" type="button" onclick="openPrescriptionGeneratorWithPatient()">Open generator with consultation details</button>
+            <a class="action secondary" href="https://ai-clinic-app-mu3y.onrender.com/" target="_blank" rel="noopener">Open blank generator</a>
+            <button class="secondary" type="button" onclick="copyPrescriptionContext()">Copy details</button>
           </div>
         </div>
       </div>
@@ -352,6 +353,37 @@ function saveConsultation(status){
     document.getElementById('consultationNotice').textContent=e.message||String(e);
   }).adminSaveConsultation(sessionToken,currentConsultationBooking.requestId,payload,status);
 }
+
+function openPrescriptionGeneratorWithPatient(){
+  if(!currentConsultationBooking){
+    document.getElementById('consultationNotice').textContent='Open a confirmed appointment first.';
+    return;
+  }
+  const popup=window.open('about:blank','_blank');
+  if(!popup){
+    document.getElementById('consultationNotice').textContent='Your browser blocked the new tab. Allow pop-ups for the doctor dashboard and try again.';
+    return;
+  }
+  try{popup.document.write('<p style="font:16px system-ui;padding:24px">Preparing the prescription workspace…</p>');}catch(e){}
+  const payload={};
+  Object.keys(consultationFields).forEach(key=>{
+    payload[key]=document.getElementById(consultationFields[key]).value||'';
+  });
+  document.getElementById('consultationNotice').textContent='Creating a secure one-time prescription handoff…';
+  google.script.run.withSuccessHandler(r=>{
+    if(!r || !r.ok || !r.token){
+      try{popup.close();}catch(e){}
+      document.getElementById('consultationNotice').textContent='Could not create the prescription handoff. Please try again.';
+      return;
+    }
+    popup.location.href='https://ai-clinic-app-mu3y.onrender.com/?handoff='+encodeURIComponent(r.token);
+    document.getElementById('consultationNotice').textContent='Prescription app opened. Its one-time handoff expires in 3 minutes.';
+  }).withFailureHandler(e=>{
+    try{popup.close();}catch(err){}
+    document.getElementById('consultationNotice').textContent=e.message||String(e);
+  }).adminCreatePrescriptionHandoff(sessionToken,currentConsultationBooking.requestId,payload);
+}
+
 function copyPrescriptionContext(){
   if(!currentConsultationBooking)return;
   const b=currentConsultationBooking;
