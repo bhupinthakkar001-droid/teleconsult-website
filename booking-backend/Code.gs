@@ -79,6 +79,16 @@ function setupBookingSystem() {
 function doGet(e) {
   const p = (e && e.parameter) || {};
   if (String(p.action || '') === 'admin') return HtmlService.createHtmlOutputFromFile('Admin').setTitle('Doctor Admin Dashboard');
+  if (String(p.action || '') === 'consumePrescriptionHandoff') {
+    const result = consumePrescriptionHandoff_(String(p.token || ''));
+    const payload = JSON.stringify(result);
+    const callback = String(p.callback || '');
+    if (callback && /^[A-Za-z_$][0-9A-Za-z_$]*$/.test(callback)) {
+      return ContentService.createTextOutput(callback + '(' + payload + ');')
+        .setMimeType(ContentService.MimeType.JAVASCRIPT);
+    }
+    return jsonOutput(result);
+  }
   if (String(p.action || '') === 'bookingOptions') {
     const payload=JSON.stringify({ok:true,priorityEnabled:getPriorityBookingsEnabled_()});
     const callback=String(p.callback||'');
@@ -1174,6 +1184,76 @@ function adminSaveConsultation(token, requestId, payload, requestedStatus) {
     return {ok:true, status:status, updatedAt:now, message:status==='COMPLETED'?'Consultation marked completed and saved.':'Consultation draft saved.'};
   } finally {
     lock.releaseLock();
+  }
+}
+
+
+/* ---------------- ONE-TIME PRESCRIPTION HANDOFF ----------------
+   Transfers only a short-lived, single-use payload to the authenticated
+   prescription app. No patient details are placed in the URL.
+*/
+function adminCreatePrescriptionHandoff(token, requestId, formPayload) {
+  requireAdminSession_(token);
+  const booking = findConfirmedBookingForConsultation_(cleanText_(requestId,80));
+  const p = formPayload || {};
+  const field = function(key, limit) {
+    return cleanMultilineText_(p[key] || '', limit);
+  };
+  const clinicalParts = [
+    booking.presentingComplaint ? 'Presenting complaint: ' + booking.presentingComplaint : '',
+    booking.medicalHistory ? 'Past medical history: ' + booking.medicalHistory : '',
+    field('clinicalHistory',5000) ? 'Clinical history: ' + field('clinicalHistory',5000) : '',
+    field('examination',3000) ? 'Examination / video assessment: ' + field('examination',3000) : '',
+    field('bloodPressure',50) ? 'Blood pressure: ' + field('bloodPressure',50) : '',
+    field('pulse',30) ? 'Pulse: ' + field('pulse',30) : '',
+    field('respiratoryRate',30) ? 'Respiratory rate: ' + field('respiratoryRate',30) : '',
+    field('temperature',30) ? 'Temperature: ' + field('temperature',30) : '',
+    field('spo2',30) ? 'SpO2: ' + field('spo2',30) : '',
+    field('investigations',2000) ? 'Relevant investigations: ' + field('investigations',2000) : ''
+  ].filter(Boolean);
+  const now = new Date();
+  const handoff = {
+    patient: {
+      name: cleanText_(booking.patientName,80),
+      age: cleanText_(p.age,3),
+      sex: cleanText_(p.sex,30),
+      weight: cleanText_(p.weight,10)
+    },
+    prescriptionDate: Utilities.formatDate(now,TIME_ZONE,'yyyy-MM-dd'),
+    prescriptionTime: Utilities.formatDate(now,TIME_ZONE,'HH:mm'),
+    clinical: clinicalParts.join('\n'),
+    assessment: field('assessmentDiagnosis',2000),
+    history: [
+      field('currentMedicines',2000),
+      booking.medicalHistory
+    ].filter(Boolean).join('\n'),
+    allergies: field('allergies',1000),
+    advice: field('treatmentPlan',4000),
+    investigations: field('investigations',2000),
+    followup: [
+      field('followUpAdvice',2000),
+      field('followUpDate',20) ? 'Follow-up date: ' + field('followUpDate',20) : ''
+    ].filter(Boolean).join('\n')
+  };
+  const cache = CacheService.getScriptCache();
+  const handoffToken = Utilities.getUuid().replace(/-/g,'') + Utilities.getUuid().replace(/-/g,'');
+  cache.put('RX_HANDOFF_' + handoffToken, JSON.stringify(handoff), 180);
+  return {ok:true, token:handoffToken, expiresInSeconds:180};
+}
+
+function consumePrescriptionHandoff_(handoffToken) {
+  if (!/^[A-Fa-f0-9]{64}$/.test(String(handoffToken || ''))) {
+    return {ok:false,error:'This prescription handoff link is invalid or has expired. Return to the doctor dashboard and try again.'};
+  }
+  const cache = CacheService.getScriptCache();
+  const key = 'RX_HANDOFF_' + handoffToken;
+  const raw = cache.get(key);
+  if (!raw) return {ok:false,error:'This one-time prescription handoff has expired or was already used. Return to the doctor dashboard and create a new one.'};
+  cache.remove(key);
+  try {
+    return {ok:true,payload:JSON.parse(raw)};
+  } catch (err) {
+    return {ok:false,error:'The prescription handoff could not be read. Please create a new one.'};
   }
 }
 
