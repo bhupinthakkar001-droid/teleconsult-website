@@ -103,6 +103,7 @@
           <button class="secondary" type="button" onclick="closeConsultation()">Back</button>
         </div>
         <div id="consultationPatientSummary" class="consult-summary"></div>
+        <div id="consultationMeetAction" class="row" style="margin:8px 0 12px"></div>
         <div id="consultationNotice" class="consult-status">Loading consultation record…</div>
         <div class="consult-grid">
           <div class="consult-field"><label for="consultAge">Age</label><input id="consultAge" type="number" min="0" max="120" inputmode="numeric" placeholder="Age in years"></div>
@@ -289,6 +290,9 @@ function openConsultation(requestId){
     booking.patientName+' · '+booking.patientPhone+' · '+booking.date+' at '+booking.time+
     ' · '+booking.visitType+' · Request '+booking.requestId+
     (booking.presentingComplaint?' · Presenting problem: '+booking.presentingComplaint:'');
+  document.getElementById('consultationMeetAction').innerHTML=booking.videoLink
+    ? '<a class="action primary" href="'+esc(booking.videoLink)+'" target="_blank" rel="noopener">Open Google Meet in new tab</a>'
+    : '<span class="muted">No Google Meet link is attached to this appointment.</span>';
   currentConsultationBooking=booking;
   Object.values(consultationFields).forEach(id=>{document.getElementById(id).value='';});
   google.script.run.withSuccessHandler(r=>{
