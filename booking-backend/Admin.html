@@ -33,6 +33,9 @@
     .intake-body{display:grid;gap:9px;margin-top:12px;font-size:13px}
     .intake-body strong{display:block;font-size:12px;color:var(--muted);margin-bottom:3px}
     .intake-body p{white-space:pre-wrap;margin:0;color:var(--ink);overflow-wrap:anywhere}
+    .priority-card{border:2px solid #d18b32;background:#fffdf8}
+    .priority-label{display:inline-flex;align-items:center;background:#fff0d5;color:#89520b;border-radius:99px;padding:5px 10px;font-size:11px;font-weight:800}
+    .priority-meta{color:#89520b;font-size:13px;font-weight:750;margin:7px 0}
     @media(max-width:420px){.slot-grid{grid-template-columns:1fr}.slot-form-actions{flex-direction:column}}
   </style>
 </head>
@@ -113,6 +116,12 @@ function render(){
   const items=data[currentTab]||[], root=document.getElementById('requestList');
   if(!items.length){root.innerHTML='<div class="card empty">No '+currentTab+' appointments.</div>';return;}
   root.innerHTML=items.map(x=>{
+    const isPriority=x.serviceLevel==='PRIORITY';
+    const cardClass=isPriority?'card priority-card':'card';
+    const service='<div class="row" style="align-items:center;gap:8px;margin:6px 0">'+
+      (isPriority?'<span class="priority-label">PRIORITY SAME-DAY</span>':'')+
+      '<span class="meta">Fee: ₹'+esc(x.consultationFee|| (isPriority?'2000':'500'))+'</span></div>'+
+      (isPriority?'<div class="priority-meta">Expected response: within 30 minutes · Subject to doctor availability</div>':'');
     let actions='';
     if(currentTab==='confirmed' && x.videoLink){
       const phone=normalisePhone(x.patientPhone);
@@ -126,14 +135,15 @@ function render(){
     } else if(currentTab==='confirmed') {
       actions='<p class="meta">Meet link is not available for this appointment. Please check the Requests sheet.</p>';
     } else {
-      actions='<div class="row" style="margin-top:14px"><button class="primary" onclick="decide(\''+esc(x.requestId)+'\',true)">Approve & create Meet</button><button class="danger" onclick="decide(\''+esc(x.requestId)+'\',false)">Decline</button></div>';
+      const approveText=isPriority?'Accept priority & create Meet':'Approve & create Meet';
+      actions='<div class="row" style="margin-top:14px"><button class="primary" onclick="decide(\''+esc(x.requestId)+'\',true)">'+approveText+'</button><button class="danger" onclick="decide(\''+esc(x.requestId)+'\',false)">Decline</button></div>';
     }
     const intake='<details class="intake-details"><summary>Patient intake details</summary><div class="intake-body">'+
       '<div><strong>Presenting complaint & duration</strong><p>'+esc(x.presentingComplaint||'Not recorded for this booking.')+'</p></div>'+
       '<div><strong>Existing diseases / past medical history</strong><p>'+esc(x.medicalHistory||'Not provided')+'</p></div>'+
       '<div><strong>Online consultation consent</strong><p>'+(x.onlineConsultConsent==='YES'?'Given':'Not recorded for this booking')+'</p></div>'+
       '</div></details>';
-    return '<article class="card"><div class="row" style="justify-content:space-between;align-items:center"><div class="name">'+esc(x.patientName)+'</div><span class="pill">'+esc(x.status)+'</span></div><div class="meta">'+esc(x.date)+' · '+esc(x.time)+'</div><div class="meta">'+esc(x.visitType)+'</div><div class="meta">Mobile: '+esc(x.patientPhone)+'</div><div class="meta small">Request ID: '+esc(x.requestId)+'</div>'+intake+actions+'</article>';
+    return '<article class="'+cardClass+'"><div class="row" style="justify-content:space-between;align-items:center"><div class="name">'+esc(x.patientName)+'</div><span class="pill">'+esc(x.status)+'</span></div><div class="meta">'+esc(x.date)+' · '+esc(x.time)+'</div><div class="meta">'+esc(x.visitType)+'</div><div class="meta">Mobile: '+esc(x.patientPhone)+'</div><div class="meta small">Request ID: '+esc(x.requestId)+'</div>'+service+intake+actions+'</article>';
   }).join('');
 }
 function loadChangeRequests(){
