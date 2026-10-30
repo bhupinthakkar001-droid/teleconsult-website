@@ -29,7 +29,7 @@ body{background:var(--bg);min-height:100svh;display:flex;flex-direction:column}
 .book{width:100%;min-height:68px;border:0;border-radius:17px;background:var(--green);color:white;font-size:18px;font-weight:800;letter-spacing:-.02em;display:flex;align-items:center;justify-content:center;gap:15px;cursor:pointer;box-shadow:0 10px 24px rgba(33,99,76,.16);transition:transform .15s,background .15s}
 .book:hover{background:var(--green-dark);transform:translateY(-2px)}.arrow{font-size:22px;font-weight:500}
 .under{margin-top:13px;text-align:center;font-size:12px;color:var(--muted)}
-.manage-link{display:block;margin:12px auto 0;border:0;background:transparent;color:var(--green);font:700 13px inherit;text-decoration:underline;text-underline-offset:3px;cursor:pointer;padding:7px}
+.manage-link{display:block;margin:12px auto 0;border:0;background:transparent;color:var(--green);font-family:inherit;font-size:13px;font-weight:700;text-decoration:underline;text-underline-offset:3px;cursor:pointer;padding:7px}
 .manage-options{display:grid;gap:12px}
 .manage-help{font-size:12px;line-height:1.45;color:var(--muted);margin:0}
 .manage-section{display:none}
@@ -166,7 +166,7 @@ manageForm.addEventListener('submit',e=>{
   if(!apiReady){manageNotice('The appointment service is not connected. Please contact the doctor.');return;}
   const id=document.getElementById('manageRequestId').value.trim();
   const phone=document.getElementById('managePhone').value.trim();
-  if(!id||phone.replace(/\\D/g,'').length<10){manageNotice('Enter your booking reference and the mobile number used for booking.');return;}
+  if(!id||phone.replace(/\D/g,'').length<10){manageNotice('Enter your booking reference and the mobile number used for booking.');return;}
   if(!manageType.value){manageNotice('Please choose cancellation or rescheduling.');return;}
   const target=document.getElementById('manageNewSlotId');
   if(manageType.value==='RESCHEDULE'){
