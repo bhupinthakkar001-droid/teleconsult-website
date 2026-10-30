@@ -201,7 +201,9 @@ function render(){
     const intake='<details class="intake-details"><summary>Patient intake details</summary><div class="intake-body">'+
       '<div><strong>Presenting complaint & duration</strong><p>'+esc(x.presentingComplaint||'Not recorded for this booking.')+'</p></div>'+
       '<div><strong>Existing diseases / past medical history</strong><p>'+esc(x.medicalHistory||'Not provided')+'</p></div>'+
-      '<div><strong>Online consultation consent</strong><p>'+(x.onlineConsultConsent==='YES'?'Given':'Not recorded for this booking')+'</p></div>'+
+      '<div><strong>Telemedicine consent</strong><p>'+(x.onlineConsultConsent==='YES'?'Recorded':'Not recorded for this booking')+(x.consentAt?' · '+esc(x.consentAt):'')+'</p></div>'+
+      '<div><strong>Health information use consent</strong><p>'+(x.dataUseConsent==='YES'?'Recorded':'Not recorded for this booking')+(x.dataConsentAt?' · '+esc(x.dataConsentAt):'')+'</p></div>'+
+      '<div><strong>Consent wording version</strong><p>'+esc(x.consentVersion||'Older booking / version not recorded')+'</p></div>'+
       '</div></details>';
     return '<article class="'+cardClass+'"><div class="row" style="justify-content:space-between;align-items:center"><div class="name">'+esc(x.patientName)+'</div><span class="pill">'+esc(x.status)+'</span></div><div class="meta">'+esc(x.date)+' · '+esc(x.time)+'</div><div class="meta">'+esc(x.visitType)+'</div><div class="meta">Mobile: '+esc(x.patientPhone)+'</div><div class="meta small">Request ID: '+esc(x.requestId)+'</div>'+service+intake+actions+'</article>';
   }).join('');
