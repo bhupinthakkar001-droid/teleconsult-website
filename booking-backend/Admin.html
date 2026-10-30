@@ -49,6 +49,22 @@
     .emr-alert{background:#fff8e9;border:1px solid #ecd49b;color:#76520e;border-radius:10px;padding:10px;margin:10px 0;font-size:12px;white-space:pre-wrap}
     .emr-rx{border:1px solid var(--line);border-radius:12px;padding:12px;margin-top:10px;background:#fbfcfb}
     .emr-rx strong{font-size:13px}.emr-rx p{font-size:12px;color:var(--muted);white-space:pre-wrap;margin:5px 0}
+    .followup-layout{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:12px 0}
+    .followup-panel{background:#fff;border:1px solid var(--line);border-radius:16px;padding:14px}
+    .followup-item{border:1px solid var(--line);border-radius:12px;padding:11px;margin-top:9px;background:#fbfcfb}
+    .followup-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+    .followup-status{font-size:11px;font-weight:800;border-radius:99px;padding:4px 8px;white-space:nowrap}
+    .followup-status.overdue{background:#ffebe8;color:#a23328}
+    .followup-status.today{background:#fff3d8;color:#875800}
+    .followup-status.upcoming{background:#e8f2ff;color:#315c91}
+    .followup-meta{font-size:12px;color:var(--muted);margin-top:4px}
+    .followup-actions{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+    .followup-actions button{padding:9px 11px;font-size:12px}
+    .followup-form label{display:block;font-size:13px;font-weight:700;margin:8px 0 4px}
+    .followup-form input,.followup-form textarea,.followup-form select{width:100%;padding:10px;border:1px solid var(--line);border-radius:10px;font:inherit}
+    .followup-form textarea{min-height:58px;resize:vertical}
+    .followup-status-text{font-size:12px;margin-top:8px;min-height:18px}
+    @media(max-width:620px){.followup-layout{grid-template-columns:1fr}}
     @media(max-width:620px){.emr-layout{grid-template-columns:1fr}.emr-list{max-height:250px}.emr-form-grid{grid-template-columns:1fr}.emr-field.full{grid-column:auto}}
     @media(max-width:420px){.slot-grid{grid-template-columns:1fr}.slot-form-actions{flex-direction:column}}
   </style>
@@ -112,6 +128,26 @@
           <button class="secondary" type="button" onclick="loadEmrPatients()">Refresh</button>
         </div>
         <div class="muted" id="emrListStatus" style="margin:10px 0">Loading patient records…</div>
+      </div>
+      <div class="followup-layout">
+        <section class="followup-panel">
+          <h2>Due & upcoming follow-ups</h2>
+          <div class="muted" id="followUpListStatus">Loading follow-ups…</div>
+          <div id="followUpList"></div>
+          <button class="secondary full" type="button" style="margin-top:10px" onclick="loadFollowUps()">Refresh follow-ups</button>
+        </section>
+        <section class="followup-panel followup-form">
+          <h2>Schedule a patient follow-up</h2>
+          <div class="muted">Choose a saved EMR patient and a due date. WhatsApp reminders are opened for you to review and send manually.</div>
+          <label for="followUpPatient">Patient</label>
+          <select id="followUpPatient"><option value="">Choose a saved patient</option></select>
+          <label for="followUpDueDate">Follow-up due date</label>
+          <input id="followUpDueDate" type="date">
+          <label for="followUpReason">Reason / note (optional)</label>
+          <textarea id="followUpReason" maxlength="300" placeholder="e.g. Review symptoms, reports or treatment response"></textarea>
+          <button id="scheduleFollowUpBtn" class="primary full" type="button" style="margin-top:12px" onclick="scheduleFollowUp()">Schedule follow-up</button>
+          <div id="followUpFormStatus" class="followup-status-text"></div>
+        </section>
       </div>
       <div class="emr-layout">
         <div id="emrPatientList" class="emr-list"></div>
@@ -216,7 +252,7 @@ function showTab(tab){
   document.getElementById('slotPanel').classList.toggle('hidden',tab!=='slots');
   document.getElementById('changePanel').classList.toggle('hidden',tab!=='changes');
   document.getElementById('patientPanel').classList.toggle('hidden',tab!=='patients');
-  if(tab==='slots')loadSlots();else if(tab==='changes')loadChangeRequests();else if(tab==='patients')loadEmrPatients();else render();
+  if(tab==='slots')loadSlots();else if(tab==='changes')loadChangeRequests();else if(tab==='patients'){loadEmrPatients();loadFollowUps();}else render();
 }
 function loadRequests(successNotice){
   document.getElementById('notice').textContent='Loading appointments…';
@@ -301,18 +337,103 @@ function openPrescriptionGeneratorWithBooking(requestId){
 }
 
 
-let emrPatients=[], selectedEmrPatientId='';
+let emrPatients=[], selectedEmrPatientId='', emrFollowUps=[];
 const emrFields={
   patientName:'emrName',phone:'emrPhone',age:'emrAge',sex:'emrSex',weight:'emrWeight',
   height:'emrHeight',allergies:'emrAllergies',allergyReaction:'emrAllergyReaction',
   clinicalAlerts:'emrAlerts',chronicConditions:'emrChronic',medicalHistory:'emrHistory',
   surgicalHistory:'emrSurgery',familyHistory:'emrFamily',currentMedicines:'emrMedicines'
 };
+function renderFollowUpPatientOptions(extraPatient){
+  const select=document.getElementById('followUpPatient');
+  if(!select)return;
+  const options=emrPatients.slice();
+  if(extraPatient && !options.some(p=>p.patientId===extraPatient.patientId)){
+    options.unshift({patientId:extraPatient.patientId,patientName:extraPatient.patientName,phone:extraPatient.phone});
+  }
+  const selected=selectedEmrPatientId||select.value;
+  select.innerHTML='<option value="">Choose a saved patient</option>'+options.map(p=>
+    '<option value="'+esc(p.patientId)+'">'+esc(p.patientName)+' · '+esc(p.phone)+'</option>'
+  ).join('');
+  if(options.some(p=>p.patientId===selected))select.value=selected;
+}
+function loadFollowUps(){
+  const status=document.getElementById('followUpListStatus');
+  if(status)status.textContent='Loading follow-ups…';
+  google.script.run.withSuccessHandler(r=>{
+    emrFollowUps=r.followUps||[];
+    renderFollowUps();
+  }).withFailureHandler(e=>{
+    if(status)status.textContent=e.message||String(e);
+  }).adminListFollowUps(sessionToken);
+}
+function renderFollowUps(){
+  const root=document.getElementById('followUpList');
+  const status=document.getElementById('followUpListStatus');
+  if(!root||!status)return;
+  const pending=emrFollowUps.filter(x=>String(x.status||'PENDING').toUpperCase()==='PENDING')
+    .sort((a,b)=>String(a.dueDate).localeCompare(String(b.dueDate)));
+  const today=localDateString();
+  const overdue=pending.filter(x=>x.dueDate<today).length;
+  const dueToday=pending.filter(x=>x.dueDate===today).length;
+  status.textContent=pending.length+' pending · '+overdue+' overdue · '+dueToday+' due today';
+  if(!pending.length){
+    root.innerHTML='<div class="empty">No pending follow-ups. Schedule one from a saved patient record.</div>';
+    return;
+  }
+  root.innerHTML=pending.slice(0,100).map(item=>{
+    const isOverdue=item.dueDate<today;
+    const isToday=item.dueDate===today;
+    const state=isOverdue?'overdue':(isToday?'today':'upcoming');
+    const label=isOverdue?'OVERDUE':(isToday?'DUE TODAY':'UPCOMING');
+    const parts=String(item.dueDate||'').split('-').map(Number);
+    const dateText=parts.length===3?new Date(parts[0],parts[1]-1,parts[2]).toLocaleDateString('en-IN'):(item.dueDate||'Date not set');
+    const digits=String(item.phone||'').replace(/\\D/g,'');
+    const waPhone=digits.length===10?'91'+digits:digits;
+    const message='Hello '+item.patientName+', this is a follow-up reminder from Dr. Bhupin Thakkar’s online consultation service. Your follow-up is due on '+dateText+'. Please reply here or use the online booking page to arrange your review: https://bhupinthakkar001-droid.github.io/teleconsult-website/.';
+    const wa= /^\\d{10,15}$/.test(waPhone)?'https://wa.me/'+waPhone+'?text='+encodeURIComponent(message):'';
+    return '<article class="followup-item"><div class="followup-top"><div><strong>'+esc(item.patientName)+'</strong><div class="followup-meta">'+esc(item.phone)+' · '+esc(item.reason||'Follow-up review')+'</div></div><span class="followup-status '+state+'">'+label+'</span></div>'+
+      '<div class="followup-meta">Due: '+esc(dateText)+' · Patient ID: '+esc(item.patientId)+'</div>'+
+      '<div class="followup-actions">'+(wa?'<a class="action whatsapp" href="'+esc(wa)+'" target="_blank" rel="noopener">WhatsApp reminder</a>':'')+
+      '<button class="primary" type="button" onclick="updateFollowUpStatus(\''+esc(item.followUpId)+'\',\'COMPLETED\')">Mark completed</button>'+
+      '<button class="secondary" type="button" onclick="updateFollowUpStatus(\''+esc(item.followUpId)+'\',\'CANCELLED\')">Cancel</button></div></article>';
+  }).join('');
+}
+function scheduleFollowUp(){
+  const patientId=document.getElementById('followUpPatient').value;
+  const dueDate=document.getElementById('followUpDueDate').value;
+  const reason=document.getElementById('followUpReason').value.trim();
+  const button=document.getElementById('scheduleFollowUpBtn');
+  const status=document.getElementById('followUpFormStatus');
+  if(!patientId){status.textContent='Choose a saved patient first.';return;}
+  if(!dueDate){status.textContent='Choose a follow-up date.';return;}
+  button.disabled=true;button.textContent='Saving…';status.textContent='Creating follow-up…';
+  google.script.run.withSuccessHandler(r=>{
+    button.disabled=false;button.textContent='Schedule follow-up';
+    status.textContent=r.message+' Due '+r.dueDate+'.';
+    document.getElementById('followUpReason').value='';
+    loadFollowUps();
+  }).withFailureHandler(e=>{
+    button.disabled=false;button.textContent='Schedule follow-up';
+    status.textContent=e.message||String(e);
+  }).adminSaveFollowUp(sessionToken,{patientId:patientId,dueDate:dueDate,reason:reason});
+}
+function updateFollowUpStatus(followUpId,nextStatus){
+  if(nextStatus==='CANCELLED'&&!confirm('Cancel this follow-up?'))return;
+  if(nextStatus==='COMPLETED'&&!confirm('Mark this follow-up as completed?'))return;
+  google.script.run.withSuccessHandler(r=>{
+    document.getElementById('followUpListStatus').textContent=r.message;
+    loadFollowUps();
+  }).withFailureHandler(e=>{
+    document.getElementById('followUpListStatus').textContent=e.message||String(e);
+  }).adminUpdateFollowUpStatus(sessionToken,followUpId,nextStatus);
+}
 function loadEmrPatients(){
   document.getElementById('emrListStatus').textContent='Loading patient records…';
   google.script.run.withSuccessHandler(r=>{
     emrPatients=r.patients||[];
     renderEmrPatientList();
+    renderFollowUpPatientOptions();
     document.getElementById('emrListStatus').textContent=emrPatients.length+' patient record(s) shown.';
   }).withFailureHandler(e=>{
     document.getElementById('emrListStatus').textContent=e.message||String(e);
@@ -348,6 +469,8 @@ function openEmrPatient(patientId){
   document.getElementById('emrRecordStatus').textContent='Loading patient record…';
   google.script.run.withSuccessHandler(r=>{
     selectedEmrPatientId=r.patient.patientId;
+    renderFollowUpPatientOptions(r.patient);
+    document.getElementById('followUpPatient').value=r.patient.patientId;
     Object.keys(emrFields).forEach(key=>{
       document.getElementById(emrFields[key]).value=r.patient[key]||'';
     });
