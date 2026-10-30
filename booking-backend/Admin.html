@@ -36,6 +36,20 @@
     .priority-card{border:2px solid #d18b32;background:#fffdf8}
     .priority-label{display:inline-flex;align-items:center;background:#fff0d5;color:#89520b;border-radius:99px;padding:5px 10px;font-size:11px;font-weight:800}
     .priority-meta{color:#89520b;font-size:13px;font-weight:750;margin:7px 0}
+    .emr-layout{display:grid;grid-template-columns:minmax(0, .9fr) minmax(0,1.4fr);gap:12px;align-items:start}
+    .emr-list{display:grid;gap:8px;max-height:70vh;overflow:auto}
+    .emr-person{background:white;border:1px solid var(--line);border-radius:12px;padding:12px;cursor:pointer;text-align:left;width:100%;color:var(--ink)}
+    .emr-person.active{border:2px solid var(--green);background:#f4f8f4}
+    .emr-person strong{display:block;font-size:14px}.emr-person small{display:block;color:var(--muted);margin-top:3px;font-size:12px}
+    .emr-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
+    .emr-field{min-width:0}.emr-field.full{grid-column:1/-1}
+    .emr-field label{display:block;font-size:13px;font-weight:700;margin-top:7px}
+    .emr-field input,.emr-field textarea,.emr-field select{width:100%;padding:11px;border:1px solid var(--line);border-radius:10px;font:inherit;margin:6px 0 10px;background:white}
+    .emr-field textarea{min-height:70px;resize:vertical}
+    .emr-alert{background:#fff8e9;border:1px solid #ecd49b;color:#76520e;border-radius:10px;padding:10px;margin:10px 0;font-size:12px;white-space:pre-wrap}
+    .emr-rx{border:1px solid var(--line);border-radius:12px;padding:12px;margin-top:10px;background:#fbfcfb}
+    .emr-rx strong{font-size:13px}.emr-rx p{font-size:12px;color:var(--muted);white-space:pre-wrap;margin:5px 0}
+    @media(max-width:620px){.emr-layout{grid-template-columns:1fr}.emr-list{max-height:250px}.emr-form-grid{grid-template-columns:1fr}.emr-field.full{grid-column:auto}}
     @media(max-width:420px){.slot-grid{grid-template-columns:1fr}.slot-form-actions{flex-direction:column}}
   </style>
 </head>
@@ -60,7 +74,7 @@
         <button id="priorityToggleBtn" class="secondary" type="button" onclick="togglePriorityBookings()" disabled>Loading…</button>
       </div>
     </div>
-    <div class="tabs"><button id="pendingTab" class="active" onclick="showTab('pending')">Pending</button><button id="confirmedTab" onclick="showTab('confirmed')">Confirmed</button><button id="changesTab" onclick="showTab('changes')">Change requests</button><button id="slotsTab" onclick="showTab('slots')">Manage slots</button></div>
+    <div class="tabs"><button id="pendingTab" class="active" onclick="showTab('pending')">Pending</button><button id="confirmedTab" onclick="showTab('confirmed')">Confirmed</button><button id="patientsTab" onclick="showTab('patients')">Patients / EMR</button><button id="changesTab" onclick="showTab('changes')">Change requests</button><button id="slotsTab" onclick="showTab('slots')">Manage slots</button></div>
     <div id="notice" class="muted" style="margin:8px 2px"></div>
     <div id="requestList"></div>
     <button id="requestRefresh" class="secondary full" onclick="loadRequests()">Refresh appointments</button>
@@ -85,6 +99,53 @@
       </div>
       <div id="slotList"></div>
       <button class="secondary full" type="button" onclick="loadSlots()">Refresh slots</button>
+    </section>
+    <section id="patientPanel" class="hidden">
+      <div class="card">
+        <div class="row" style="align-items:center;justify-content:space-between">
+          <div><h2>Patient records (EMR)</h2><div class="muted">Longitudinal patient profiles and prescription history</div></div>
+          <button class="primary" type="button" onclick="newEmrPatient()">+ Add patient</button>
+        </div>
+        <div class="row" style="margin-top:12px">
+          <input id="emrSearch" placeholder="Search patient name, mobile or ID" style="flex:1;min-width:180px;margin:0" onkeydown="if(event.key==='Enter')searchEmrPatients()">
+          <button class="secondary" type="button" onclick="searchEmrPatients()">Search</button>
+          <button class="secondary" type="button" onclick="loadEmrPatients()">Refresh</button>
+        </div>
+        <div class="muted" id="emrListStatus" style="margin:10px 0">Loading patient records…</div>
+      </div>
+      <div class="emr-layout">
+        <div id="emrPatientList" class="emr-list"></div>
+        <div id="emrEditor" class="card">
+          <h2 id="emrEditorTitle">Select a patient</h2>
+          <div class="muted">Choose a patient from the list or add a new record. Match the patient carefully before updating an existing record.</div>
+          <div id="emrRecordStatus" class="muted" style="margin:10px 0"></div>
+          <div id="emrForm" class="hidden">
+            <div id="emrAlerts" class="emr-alert hidden"></div>
+            <div class="emr-form-grid">
+              <div class="emr-field"><label for="emrName">Patient name</label><input id="emrName" maxlength="80"></div>
+              <div class="emr-field"><label for="emrPhone">Mobile number</label><input id="emrPhone" inputmode="tel" maxlength="18"></div>
+              <div class="emr-field"><label for="emrAge">Age (years)</label><input id="emrAge" type="number" min="0" max="120"></div>
+              <div class="emr-field"><label for="emrSex">Sex</label><select id="emrSex"><option value="">Not recorded</option><option>Female</option><option>Male</option><option>Other / not specified</option></select></div>
+              <div class="emr-field"><label for="emrWeight">Weight (kg)</label><input id="emrWeight" inputmode="decimal"></div>
+              <div class="emr-field"><label for="emrHeight">Height (cm)</label><input id="emrHeight" inputmode="decimal"></div>
+              <div class="emr-field full"><label for="emrAllergies">Allergies</label><textarea id="emrAllergies" placeholder="Drug / food allergy or write No known allergies only if confirmed"></textarea></div>
+              <div class="emr-field full"><label for="emrAllergyReaction">Allergy reaction / severity</label><textarea id="emrAllergyReaction" placeholder="Describe the actual reaction, severity and date if known"></textarea></div>
+              <div class="emr-field full"><label for="emrAlerts">Important clinical alerts</label><textarea id="emrAlerts" placeholder="e.g. anticoagulation, implanted device, high-risk history, communication alert"></textarea></div>
+              <div class="emr-field full"><label for="emrChronic">Chronic conditions / comorbidities</label><textarea id="emrChronic"></textarea></div>
+              <div class="emr-field full"><label for="emrHistory">Past medical history</label><textarea id="emrHistory"></textarea></div>
+              <div class="emr-field full"><label for="emrSurgery">Surgical history</label><textarea id="emrSurgery"></textarea></div>
+              <div class="emr-field full"><label for="emrFamily">Family history</label><textarea id="emrFamily"></textarea></div>
+              <div class="emr-field full"><label for="emrMedicines">Current medicines</label><textarea id="emrMedicines" placeholder="Name · strength · dose · frequency"></textarea></div>
+            </div>
+            <div class="row" style="margin-top:12px">
+              <button class="primary" id="saveEmrBtn" type="button" onclick="saveEmrPatient()">Save patient record</button>
+              <button class="secondary" type="button" onclick="newEmrPatient()">New patient</button>
+            </div>
+            <div class="muted" id="emrUpdatedAt" style="margin-top:8px"></div>
+            <div style="margin-top:18px"><h2>Previous prescriptions</h2><div id="emrPrescriptionList" class="muted">Select a saved patient to view prescription history.</div></div>
+          </div>
+        </div>
+      </div>
     </section>
   </section>
 </div>
@@ -147,13 +208,15 @@ function showTab(tab){
   currentTab=tab;
   document.getElementById('pendingTab').classList.toggle('active',tab==='pending');
   document.getElementById('confirmedTab').classList.toggle('active',tab==='confirmed');
+  document.getElementById('patientsTab').classList.toggle('active',tab==='patients');
   document.getElementById('changesTab').classList.toggle('active',tab==='changes');
   document.getElementById('slotsTab').classList.toggle('active',tab==='slots');
-  document.getElementById('requestList').classList.toggle('hidden',tab==='slots'||tab==='changes');
-  document.getElementById('requestRefresh').classList.toggle('hidden',tab==='slots'||tab==='changes');
+  document.getElementById('requestList').classList.toggle('hidden',tab==='slots'||tab==='changes'||tab==='patients');
+  document.getElementById('requestRefresh').classList.toggle('hidden',tab==='slots'||tab==='changes'||tab==='patients');
   document.getElementById('slotPanel').classList.toggle('hidden',tab!=='slots');
   document.getElementById('changePanel').classList.toggle('hidden',tab!=='changes');
-  if(tab==='slots')loadSlots();else if(tab==='changes')loadChangeRequests();else render();
+  document.getElementById('patientPanel').classList.toggle('hidden',tab!=='patients');
+  if(tab==='slots')loadSlots();else if(tab==='changes')loadChangeRequests();else if(tab==='patients')loadEmrPatients();else render();
 }
 function loadRequests(successNotice){
   document.getElementById('notice').textContent='Loading appointments…';
@@ -235,6 +298,107 @@ function openPrescriptionGeneratorWithBooking(requestId){
     try{popup.close();}catch(err){}
     document.getElementById('notice').textContent=e.message||String(e);
   }).adminCreatePrescriptionHandoff(sessionToken,requestId);
+}
+
+
+let emrPatients=[], selectedEmrPatientId='';
+const emrFields={
+  patientName:'emrName',phone:'emrPhone',age:'emrAge',sex:'emrSex',weight:'emrWeight',
+  height:'emrHeight',allergies:'emrAllergies',allergyReaction:'emrAllergyReaction',
+  clinicalAlerts:'emrAlerts',chronicConditions:'emrChronic',medicalHistory:'emrHistory',
+  surgicalHistory:'emrSurgery',familyHistory:'emrFamily',currentMedicines:'emrMedicines'
+};
+function loadEmrPatients(){
+  document.getElementById('emrListStatus').textContent='Loading patient records…';
+  google.script.run.withSuccessHandler(r=>{
+    emrPatients=r.patients||[];
+    renderEmrPatientList();
+    document.getElementById('emrListStatus').textContent=emrPatients.length+' patient record(s) shown.';
+  }).withFailureHandler(e=>{
+    document.getElementById('emrListStatus').textContent=e.message||String(e);
+  }).adminSearchPatients(sessionToken,document.getElementById('emrSearch').value||'');
+}
+function searchEmrPatients(){loadEmrPatients();}
+function renderEmrPatientList(){
+  const root=document.getElementById('emrPatientList');
+  if(!emrPatients.length){
+    root.innerHTML='<div class="card empty">No matching patient records. Add a new patient or try a different search.</div>';
+    return;
+  }
+  root.innerHTML=emrPatients.map(p=>{
+    const alert=p.allergies?'<small>Allergies: '+esc(p.allergies)+'</small>':'<small>No allergy details recorded</small>';
+    return '<button type="button" class="emr-person '+(p.patientId===selectedEmrPatientId?'active':'')+'" onclick="openEmrPatient(\\''+esc(p.patientId)+'\\')">'+
+      '<strong>'+esc(p.patientName)+'</strong><small>'+esc(p.phone)+' · '+esc(p.patientId)+'</small>'+alert+
+      (p.chronicConditions?'<small>Conditions: '+esc(p.chronicConditions)+'</small>':'')+'</button>';
+  }).join('');
+}
+function newEmrPatient(){
+  selectedEmrPatientId='';
+  Object.values(emrFields).forEach(id=>{document.getElementById(id).value='';});
+  document.getElementById('emrEditorTitle').textContent='New patient record';
+  document.getElementById('emrRecordStatus').textContent='Enter patient details and save to create a record.';
+  document.getElementById('emrForm').classList.remove('hidden');
+  document.getElementById('emrAlerts').classList.add('hidden');
+  document.getElementById('emrUpdatedAt').textContent='';
+  document.getElementById('emrPrescriptionList').textContent='No saved prescriptions for a new patient yet.';
+  document.getElementById('saveEmrBtn').textContent='Create patient record';
+  renderEmrPatientList();
+}
+function openEmrPatient(patientId){
+  document.getElementById('emrRecordStatus').textContent='Loading patient record…';
+  google.script.run.withSuccessHandler(r=>{
+    selectedEmrPatientId=r.patient.patientId;
+    Object.keys(emrFields).forEach(key=>{
+      document.getElementById(emrFields[key]).value=r.patient[key]||'';
+    });
+    document.getElementById('emrEditorTitle').textContent=r.patient.patientName+' · Patient record';
+    document.getElementById('emrRecordStatus').textContent='Patient ID: '+r.patient.patientId;
+    document.getElementById('emrForm').classList.remove('hidden');
+    const alertText=[
+      r.patient.allergies?'Allergies: '+r.patient.allergies:'',
+      r.patient.allergyReaction?'Reaction: '+r.patient.allergyReaction:'',
+      r.patient.clinicalAlerts?'Clinical alerts: '+r.patient.clinicalAlerts:''
+    ].filter(Boolean).join('\\n');
+    const alertBox=document.getElementById('emrAlerts');
+    alertBox.textContent=alertText;
+    alertBox.classList.toggle('hidden',!alertText);
+    document.getElementById('emrUpdatedAt').textContent='Last updated: '+(r.patient.updatedAt||'Not recorded');
+    renderEmrPrescriptions(r.prescriptions||[]);
+    document.getElementById('saveEmrBtn').textContent='Save patient record';
+    renderEmrPatientList();
+  }).withFailureHandler(e=>{
+    document.getElementById('emrRecordStatus').textContent=e.message||String(e);
+  }).adminGetPatientRecord(sessionToken,patientId);
+}
+function renderEmrPrescriptions(items){
+  const root=document.getElementById('emrPrescriptionList');
+  if(!items.length){root.innerHTML='<div class="muted">No prescriptions saved in this EMR yet.</div>';return;}
+  root.innerHTML=items.map(x=>{
+    const meds=(x.medicines||[]).map(m=>m.name+' — '+m.dose+' — '+m.instructions).join('\\n');
+    return '<article class="emr-rx"><strong>'+esc(x.prescriptionDate||x.createdAt)+' · '+esc(x.assessment||'Prescription')+'</strong>'+
+      '<p>'+esc(meds)+'</p>'+
+      (x.advice?'<p><strong>Advice:</strong> '+esc(x.advice)+'</p>':'')+
+      (x.investigations?'<p><strong>Investigations:</strong> '+esc(x.investigations)+'</p>':'')+
+      (x.followup?'<p><strong>Follow-up:</strong> '+esc(x.followup)+'</p>':'')+
+      '<p>Prescription ID: '+esc(x.prescriptionId)+'</p></article>';
+  }).join('');
+}
+function saveEmrPatient(){
+  const payload={};
+  Object.keys(emrFields).forEach(key=>{payload[key]=document.getElementById(emrFields[key]).value||'';});
+  const btn=document.getElementById('saveEmrBtn');
+  btn.disabled=true;document.getElementById('emrRecordStatus').textContent='Saving patient record…';
+  google.script.run.withSuccessHandler(r=>{
+    btn.disabled=false;
+    selectedEmrPatientId=r.patientId;
+    document.getElementById('emrRecordStatus').textContent=r.message+' Patient ID: '+r.patientId;
+    document.getElementById('emrEditorTitle').textContent=payload.patientName+' · Patient record';
+    document.getElementById('saveEmrBtn').textContent='Save patient record';
+    loadEmrPatients();
+    openEmrPatient(r.patientId);
+  }).withFailureHandler(e=>{
+    btn.disabled=false;document.getElementById('emrRecordStatus').textContent=e.message||String(e);
+  }).adminSavePatientRecord(sessionToken,selectedEmrPatientId,payload);
 }
 
 function loadChangeRequests(){
