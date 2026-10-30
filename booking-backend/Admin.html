@@ -53,9 +53,9 @@ function login(){
 }
 function logout(){sessionToken='';document.getElementById('dashboard').classList.add('hidden');document.getElementById('logout').classList.add('hidden');document.getElementById('login').classList.remove('hidden');document.getElementById('password').value='';}
 function showTab(tab){currentTab=tab;document.getElementById('pendingTab').classList.toggle('active',tab==='pending');document.getElementById('confirmedTab').classList.toggle('active',tab==='confirmed');render();}
-function loadRequests(){
+function loadRequests(successNotice){
   document.getElementById('notice').textContent='Loading appointments…';
-  google.script.run.withSuccessHandler(r=>{data=r;document.getElementById('pendingCount').textContent=r.pending.length;document.getElementById('confirmedCount').textContent=r.confirmed.length;document.getElementById('notice').textContent='';render();})
+  google.script.run.withSuccessHandler(r=>{data=r;document.getElementById('pendingCount').textContent=r.pending.length;document.getElementById('confirmedCount').textContent=r.confirmed.length;document.getElementById('notice').innerHTML=successNotice||'';render();})
     .withFailureHandler(e=>{document.getElementById('notice').textContent=e.message||String(e);if((e.message||'').includes('session expired'))logout();})
     .adminGetRequests(sessionToken);
 }
@@ -71,10 +71,14 @@ function decide(id,approve){
   document.getElementById('notice').textContent=approve?'Creating Google Meet and confirming…':'Declining appointment…';
   const runner=google.script.run.withSuccessHandler(r=>{
     if(approve){
+      showTab('confirmed');
       const msg='Hello '+(r.patientName||'')+', your video consultation with Dr. Bhupin is confirmed. Date: '+r.date+'. Time: '+r.time+'. Join using this Google Meet link: '+r.meetLink;
-      document.getElementById('notice').innerHTML='Appointment confirmed. Meet link saved. <a target="_blank" href="https://wa.me/'+encodeURIComponent(r.patientPhone)+'?text='+encodeURIComponent(msg)+'">Open WhatsApp message</a>';
-    } else document.getElementById('notice').textContent='Appointment declined and slot released.';
-    loadRequests();
+      const meetLink='<a target="_blank" rel="noopener" href="'+esc(r.meetLink)+'">Open Google Meet</a>';
+      const whatsappLink='<a target="_blank" rel="noopener" href="https://wa.me/'+encodeURIComponent(r.patientPhone)+'?text='+encodeURIComponent(msg)+'">Send WhatsApp confirmation</a>';
+      loadRequests('Appointment confirmed successfully. '+meetLink+' &nbsp;·&nbsp; '+whatsappLink);
+    } else {
+      loadRequests('Appointment declined and slot released.');
+    }
   }).withFailureHandler(e=>{document.getElementById('notice').textContent=e.message||String(e);});
   if(approve)runner.adminApproveRequest(sessionToken,id);else runner.adminDeclineRequest(sessionToken,id);
 }
