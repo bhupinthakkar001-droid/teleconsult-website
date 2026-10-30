@@ -54,6 +54,12 @@
       <div class="card" style="flex:1;margin:0"><div class="muted">Pending</div><div id="pendingCount" style="font-size:28px;font-weight:800">0</div></div>
       <div class="card" style="flex:1;margin:0"><div class="muted">Confirmed</div><div id="confirmedCount" style="font-size:28px;font-weight:800">0</div></div>
     </div>
+    <div class="card" id="priorityControl" style="margin:0 0 14px">
+      <div class="row" style="justify-content:space-between;align-items:center;gap:12px">
+        <div><strong>Priority response option</strong><div id="priorityStatus" class="muted">Checking availability…</div></div>
+        <button id="priorityToggleBtn" class="secondary" type="button" onclick="togglePriorityBookings()" disabled>Loading…</button>
+      </div>
+    </div>
     <div class="tabs"><button id="pendingTab" class="active" onclick="showTab('pending')">Pending</button><button id="confirmedTab" onclick="showTab('confirmed')">Confirmed</button><button id="changesTab" onclick="showTab('changes')">Change requests</button><button id="slotsTab" onclick="showTab('slots')">Manage slots</button></div>
     <div id="notice" class="muted" style="margin:8px 2px"></div>
     <div id="requestList"></div>
@@ -83,15 +89,60 @@
   </section>
 </div>
 <script>
-let sessionToken='', currentTab='pending', data={pending:[],confirmed:[]}, slotsData=[], editingSlotId='', changeRequests=[];
+let sessionToken='', currentTab='pending', data={pending:[],confirmed:[]}, slotsData=[], editingSlotId='', changeRequests=[], priorityEnabled=true;
 function showError(id,msg){document.getElementById(id).textContent=msg||''}
 function login(){
   const btn=document.getElementById('loginBtn');btn.disabled=true;btn.textContent='Signing in…';showError('loginError','');
-  google.script.run.withSuccessHandler(r=>{sessionToken=r.token;document.getElementById('login').classList.add('hidden');document.getElementById('dashboard').classList.remove('hidden');document.getElementById('logout').classList.remove('hidden');document.getElementById('slotDate').min=localDateString();loadRequests();})
+  google.script.run.withSuccessHandler(r=>{sessionToken=r.token;document.getElementById('login').classList.add('hidden');document.getElementById('dashboard').classList.remove('hidden');document.getElementById('logout').classList.remove('hidden');document.getElementById('slotDate').min=localDateString();loadRequests();loadPrioritySettings();})
     .withFailureHandler(e=>{showError('loginError',e.message||String(e));btn.disabled=false;btn.textContent='Sign in';})
     .adminLogin(document.getElementById('password').value);
 }
 function logout(){sessionToken='';document.getElementById('dashboard').classList.add('hidden');document.getElementById('logout').classList.add('hidden');document.getElementById('login').classList.remove('hidden');document.getElementById('password').value='';}
+function updatePriorityControl(){
+  const status=document.getElementById('priorityStatus');
+  const button=document.getElementById('priorityToggleBtn');
+  if(priorityEnabled){
+    status.textContent='ON · Patients can select ₹2,000 priority response consultations.';
+    button.textContent='Turn OFF';
+    button.className='danger';
+  }else{
+    status.textContent='OFF · Only regular ₹500 consultations are being offered.';
+    button.textContent='Turn ON';
+    button.className='primary';
+  }
+  button.disabled=false;
+}
+function loadPrioritySettings(){
+  const button=document.getElementById('priorityToggleBtn');
+  button.disabled=true;button.textContent='Loading…';
+  google.script.run.withSuccessHandler(r=>{
+    priorityEnabled=!!r.priorityEnabled;
+    updatePriorityControl();
+  }).withFailureHandler(e=>{
+    document.getElementById('priorityStatus').textContent=e.message||String(e);
+    button.textContent='Retry';
+    button.disabled=false;
+    button.className='secondary';
+  }).adminGetPrioritySettings(sessionToken);
+}
+function togglePriorityBookings(){
+  const next=!priorityEnabled;
+  const prompt=next
+    ? 'Turn ON the ₹2,000 priority response option for patients?'
+    : 'Turn OFF the priority response option? Patients will only see regular booking.';
+  if(!confirm(prompt))return;
+  const button=document.getElementById('priorityToggleBtn');
+  button.disabled=true;button.textContent='Updating…';
+  google.script.run.withSuccessHandler(r=>{
+    priorityEnabled=!!r.priorityEnabled;
+    updatePriorityControl();
+    document.getElementById('priorityStatus').textContent=r.message;
+  }).withFailureHandler(e=>{
+    button.disabled=false;
+    updatePriorityControl();
+    document.getElementById('priorityStatus').textContent=e.message||String(e);
+  }).adminSetPriorityBookingsEnabled(sessionToken,next);
+}
 function showTab(tab){
   currentTab=tab;
   document.getElementById('pendingTab').classList.toggle('active',tab==='pending');
