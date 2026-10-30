@@ -1079,7 +1079,7 @@ function findConfirmedBookingForPrescription_(requestId) {
 
 /* ---------------- PATIENT EMR ---------------- */
 const EMR_PATIENT_HEADERS = [
-  'patientId','patientName','phone','age','sex','allergies','allergyReaction',
+  'patientId','patientName','phone','age','sex','weight','height','allergies','allergyReaction',
   'chronicConditions','medicalHistory','surgicalHistory','familyHistory',
   'currentMedicines','clinicalAlerts','createdAt','updatedAt'
 ];
@@ -1124,11 +1124,11 @@ function emrNameKey_(value) {
 function emrPatientFromRow_(r) {
   return {
     patientId:String(r[0]||''),patientName:String(r[1]||''),phone:String(r[2]||''),
-    age:String(r[3]||''),sex:String(r[4]||''),allergies:String(r[5]||''),
-    allergyReaction:String(r[6]||''),chronicConditions:String(r[7]||''),
-    medicalHistory:String(r[8]||''),surgicalHistory:String(r[9]||''),
-    familyHistory:String(r[10]||''),currentMedicines:String(r[11]||''),
-    clinicalAlerts:String(r[12]||''),createdAt:String(r[13]||''),updatedAt:String(r[14]||'')
+    age:String(r[3]||''),sex:String(r[4]||''),weight:String(r[5]||''),height:String(r[6]||''),
+    allergies:String(r[7]||''),allergyReaction:String(r[8]||''),chronicConditions:String(r[9]||''),
+    medicalHistory:String(r[10]||''),surgicalHistory:String(r[11]||''),
+    familyHistory:String(r[12]||''),currentMedicines:String(r[13]||''),
+    clinicalAlerts:String(r[14]||''),createdAt:String(r[15]||''),updatedAt:String(r[16]||'')
   };
 }
 function findEmrPatientForBooking_(booking, createIfMissing) {
@@ -1150,7 +1150,7 @@ function findEmrPatientForBooking_(booking, createIfMissing) {
     patientId:'P'+Utilities.getUuid().replace(/-/g,'').slice(0,12).toUpperCase(),
     patientName:cleanText_(booking.patientName,80),
     phone:cleanPhone_(booking.patientPhone),
-    age:'',sex:'',allergies:'',allergyReaction:'',chronicConditions:'',
+    age:'',sex:'',weight:'',height:'',allergies:'',allergyReaction:'',chronicConditions:'',
     medicalHistory:String(booking.medicalHistory||''),
     surgicalHistory:'',familyHistory:'',currentMedicines:'',clinicalAlerts:'',
     createdAt:now,updatedAt:now
@@ -1217,6 +1217,8 @@ function adminSavePatientRecord(token, patientId, payload) {
       phone:cleanPhone_(p.phone),
       age:cleanText_(p.age,3),
       sex:cleanText_(p.sex,30),
+      weight:cleanText_(p.weight,20),
+      height:cleanText_(p.height,20),
       allergies:cleanMultilineText_(p.allergies,2000),
       allergyReaction:cleanMultilineText_(p.allergyReaction,2000),
       chronicConditions:cleanMultilineText_(p.chronicConditions,3000),
@@ -1305,14 +1307,22 @@ function adminCreatePrescriptionHandoff(token, requestId) {
   if (!/\b(test|fictional|demo)\b/i.test(booking.patientName)) {
     throw new Error('The connected AI Clinic app is a test-only prototype. For safety, handoff is restricted to a clearly labelled fictional/demo booking. Real patient information cannot be transferred.');
   }
+  const patient = findEmrPatientForBooking_(booking,true);
   const now = new Date();
+  const saveToken = Utilities.getUuid().replace(/-/g,'') + Utilities.getUuid().replace(/-/g,'');
+  const saveContext = {
+    patientId:patient.patientId,requestId:booking.requestId,
+    patientName:patient.patientName,phone:normalizeWhatsAppPhone_(booking.patientPhone)
+  };
+  CacheService.getScriptCache().put('RX_SAVE_'+saveToken,JSON.stringify(saveContext),7200);
   const handoff = {
     patient: {
+      id:patient.patientId,
       name: cleanText_(booking.patientName,80),
       phone: normalizeWhatsAppPhone_(booking.patientPhone),
-      age: '',
-      sex: '',
-      weight: ''
+      age: patient.age || '',
+      sex: patient.sex || '',
+      weight: patient.weight || ''
     },
     clinic: 'Dr. Bhupin Thakkar | Online Consultation',
     doctor: 'Dr. Bhupin Thakkar, MBBS, DNB (Internal Medicine)',
@@ -1320,14 +1330,22 @@ function adminCreatePrescriptionHandoff(token, requestId) {
     prescriptionTime: Utilities.formatDate(now,TIME_ZONE,'HH:mm'),
     clinical: [
       booking.presentingComplaint ? 'Presenting complaint: ' + booking.presentingComplaint : '',
-      booking.medicalHistory ? 'Past medical history: ' + booking.medicalHistory : ''
+      patient.medicalHistory ? 'Past medical history: ' + patient.medicalHistory : '',
+      patient.surgicalHistory ? 'Surgical history: ' + patient.surgicalHistory : '',
+      patient.familyHistory ? 'Family history: ' + patient.familyHistory : '',
+      patient.chronicConditions ? 'Chronic conditions: ' + patient.chronicConditions : '',
+      patient.clinicalAlerts ? 'Clinical alerts: ' + patient.clinicalAlerts : ''
     ].filter(Boolean).join('\n'),
     assessment: '',
-    history: booking.medicalHistory || '',
-    allergies: '',
+    history: [
+      patient.currentMedicines ? 'Current medicines: ' + patient.currentMedicines : '',
+      patient.medicalHistory || booking.medicalHistory || ''
+    ].filter(Boolean).join('\n'),
+    allergies: [patient.allergies,patient.allergyReaction?'Reaction: '+patient.allergyReaction:''].filter(Boolean).join('\n'),
     advice: '',
     investigations: '',
-    followup: ''
+    followup: '',
+    saveToken:saveToken
   };
   const cache = CacheService.getScriptCache();
   const handoffToken = Utilities.getUuid().replace(/-/g,'') + Utilities.getUuid().replace(/-/g,'');
