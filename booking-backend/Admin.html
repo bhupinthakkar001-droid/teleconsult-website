@@ -16,7 +16,7 @@
     .pill{font-size:12px;font-weight:750;border-radius:99px;padding:4px 9px;background:#fff2d8;color:#8b5b08}
     .meta{font-size:13px;color:var(--muted);margin:3px 0}.name{font-size:17px;font-weight:750;margin-bottom:2px}
     .empty{text-align:center;color:var(--muted);padding:20px 8px}.hidden{display:none!important}
-    .tabs{display:flex;gap:8px;margin-bottom:12px}.tabs button{flex:1;background:#e8eee9;color:var(--ink)}.tabs button.active{background:var(--green);color:white}
+    .tabs{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}.tabs button{flex:1 1 28%;background:#e8eee9;color:var(--ink)}.tabs button.active{background:var(--green);color:white}
     .error{color:#a33b31;font-size:13px;margin:8px 0}.success{color:var(--green);font-size:13px;margin:8px 0}
     a{color:var(--green);font-weight:700;overflow-wrap:anywhere}.small{font-size:12px}
     a.action{display:inline-flex;align-items:center;justify-content:center;text-decoration:none;border-radius:12px;padding:12px 15px;font:700 14px system-ui;flex:1}
@@ -63,7 +63,7 @@
     .followup-form label{display:block;font-size:13px;font-weight:700;margin:8px 0 4px}
     .followup-form input,.followup-form textarea,.followup-form select{width:100%;padding:10px;border:1px solid var(--line);border-radius:10px;font:inherit}
     .followup-form textarea{min-height:58px;resize:vertical}
-    .followup-status-text{font-size:12px;margin-top:8px;min-height:18px}
+    .followup-status-text{font-size:12px;margin-top:8px;min-height:18px}.payment-status{font-size:12px;line-height:1.45;margin:7px 0;padding:9px 10px;border-radius:10px;background:#f5f8f5;color:var(--ink)}.payment-status.verified{background:#e8f4eb;color:#205f3e}.payment-settings-grid{display:grid;grid-template-columns:1fr;gap:4px}.payment-settings-grid label{font-size:13px;font-weight:750;margin-top:9px}
     @media(max-width:620px){.followup-layout{grid-template-columns:1fr}}
     @media(max-width:620px){.emr-layout{grid-template-columns:1fr}.emr-list{max-height:250px}.emr-form-grid{grid-template-columns:1fr}.emr-field.full{grid-column:auto}}
     @media(max-width:420px){.slot-grid{grid-template-columns:1fr}.slot-form-actions{flex-direction:column}}
@@ -90,7 +90,7 @@
         <button id="priorityToggleBtn" class="secondary" type="button" onclick="togglePriorityBookings()" disabled>Loading…</button>
       </div>
     </div>
-    <div class="tabs"><button id="pendingTab" class="active" onclick="showTab('pending')">Pending</button><button id="confirmedTab" onclick="showTab('confirmed')">Confirmed</button><button id="patientsTab" onclick="showTab('patients')">Patients / EMR</button><button id="changesTab" onclick="showTab('changes')">Change requests</button><button id="slotsTab" onclick="showTab('slots')">Manage slots</button></div>
+    <div class="tabs"><button id="pendingTab" class="active" onclick="showTab('pending')">Pending</button><button id="confirmedTab" onclick="showTab('confirmed')">Confirmed</button><button id="patientsTab" onclick="showTab('patients')">Patients / EMR</button><button id="changesTab" onclick="showTab('changes')">Change requests</button><button id="slotsTab" onclick="showTab('slots')">Manage slots</button><button id="paymentTab" onclick="showTab('payment')">Payment setup</button></div>
     <div id="notice" class="muted" style="margin:8px 2px"></div>
     <div id="requestList"></div>
     <button id="requestRefresh" class="secondary full" onclick="loadRequests()">Refresh appointments</button>
@@ -98,6 +98,24 @@
       <div id="changeResult" class="muted" style="margin:8px 2px"></div>
       <div id="changeList"></div>
       <button class="secondary full" type="button" onclick="loadChangeRequests()">Refresh change requests</button>
+    </section>
+    <section id="paymentPanel" class="hidden">
+      <div class="card">
+        <h2>UPI payment setup</h2>
+        <div class="muted">Enter the UPI ID where consultation fees should be received. These details are shown publicly on the patient booking page. Keep this UPI ID active and verify every payment in your bank or UPI app.</div>
+        <div class="payment-settings-grid">
+          <label for="upiSettingsId">Your UPI ID</label><input id="upiSettingsId" maxlength="150" placeholder="yourname@bank">
+          <label for="upiSettingsName">Payee name displayed to patients</label><input id="upiSettingsName" maxlength="60" placeholder="Dr. Bhupin Thakkar">
+          <label for="upiSettingsQr">Optional UPI QR image HTTPS URL</label><input id="upiSettingsQr" maxlength="500" type="url" placeholder="https://…">
+        </div>
+        <div class="muted">The QR image is optional. Patients can also copy your UPI ID or open a UPI app with the fee pre-filled. Do not enter a bank password, UPI PIN, OTP or card details here.</div>
+        <button id="savePaymentSettingsBtn" class="primary full" type="button" style="margin-top:12px" onclick="savePaymentSettings()">Save payment details</button>
+        <div id="paymentSettingsStatus" class="muted" style="margin-top:10px">Loading payment settings…</div>
+      </div>
+      <div class="card">
+        <h2>How payment verification works</h2>
+        <div class="muted">The website collects the submitted UPI transaction reference. It does not connect to your bank and cannot independently confirm that money arrived. Open your bank or UPI app, check the exact amount and transaction reference, then press “Verify payment” on the pending appointment. Only verified bookings can be approved and receive a Google Meet link.</div>
+      </div>
     </section>
     <section id="slotPanel" class="hidden">
       <div class="card">
@@ -190,11 +208,30 @@ let sessionToken='', currentTab='pending', data={pending:[],confirmed:[]}, slots
 function showError(id,msg){document.getElementById(id).textContent=msg||''}
 function login(){
   const btn=document.getElementById('loginBtn');btn.disabled=true;btn.textContent='Signing in…';showError('loginError','');
-  google.script.run.withSuccessHandler(r=>{sessionToken=r.token;document.getElementById('login').classList.add('hidden');document.getElementById('dashboard').classList.remove('hidden');document.getElementById('logout').classList.remove('hidden');document.getElementById('slotDate').min=localDateString();loadRequests();loadPrioritySettings();})
+  google.script.run.withSuccessHandler(r=>{sessionToken=r.token;document.getElementById('login').classList.add('hidden');document.getElementById('dashboard').classList.remove('hidden');document.getElementById('logout').classList.remove('hidden');document.getElementById('slotDate').min=localDateString();loadRequests();loadPrioritySettings();loadPaymentSettings();})
     .withFailureHandler(e=>{showError('loginError',e.message||String(e));btn.disabled=false;btn.textContent='Sign in';})
     .adminLogin(document.getElementById('password').value);
 }
 function logout(){sessionToken='';document.getElementById('dashboard').classList.add('hidden');document.getElementById('logout').classList.add('hidden');document.getElementById('login').classList.remove('hidden');document.getElementById('password').value='';}
+function loadPaymentSettings(){
+  const status=document.getElementById('paymentSettingsStatus');
+  status.textContent='Loading payment settings…';
+  google.script.run.withSuccessHandler(r=>{
+    document.getElementById('upiSettingsId').value=r.upiId||'';
+    document.getElementById('upiSettingsName').value=r.payeeName||'Dr. Bhupin Thakkar';
+    document.getElementById('upiSettingsQr').value=r.qrImageUrl||'';
+    status.textContent=r.enabled?'UPI payments are configured. Patients can see these details.':'UPI payments are not configured yet.';
+  }).withFailureHandler(e=>{status.textContent=e.message||String(e);if((e.message||'').toLowerCase().includes('session expired'))logout();}).adminGetPaymentSettings(sessionToken);
+}
+function savePaymentSettings(){
+  const btn=document.getElementById('savePaymentSettingsBtn');
+  const status=document.getElementById('paymentSettingsStatus');
+  const settings={upiId:document.getElementById('upiSettingsId').value.trim(),payeeName:document.getElementById('upiSettingsName').value.trim(),qrImageUrl:document.getElementById('upiSettingsQr').value.trim()};
+  btn.disabled=true;btn.textContent='Saving…';status.textContent='Saving payment details…';
+  google.script.run.withSuccessHandler(r=>{btn.disabled=false;btn.textContent='Save payment details';status.textContent=r.message||'Payment details saved.';})
+    .withFailureHandler(e=>{btn.disabled=false;btn.textContent='Save payment details';status.textContent=e.message||String(e);})
+    .adminSavePaymentSettings(sessionToken,settings);
+}
 function updatePriorityControl(){
   const status=document.getElementById('priorityStatus');
   const button=document.getElementById('priorityToggleBtn');
@@ -247,12 +284,14 @@ function showTab(tab){
   document.getElementById('patientsTab').classList.toggle('active',tab==='patients');
   document.getElementById('changesTab').classList.toggle('active',tab==='changes');
   document.getElementById('slotsTab').classList.toggle('active',tab==='slots');
-  document.getElementById('requestList').classList.toggle('hidden',tab==='slots'||tab==='changes'||tab==='patients');
-  document.getElementById('requestRefresh').classList.toggle('hidden',tab==='slots'||tab==='changes'||tab==='patients');
+  document.getElementById('paymentTab').classList.toggle('active',tab==='payment');
+  document.getElementById('requestList').classList.toggle('hidden',tab==='slots'||tab==='changes'||tab==='patients'||tab==='payment');
+  document.getElementById('requestRefresh').classList.toggle('hidden',tab==='slots'||tab==='changes'||tab==='patients'||tab==='payment');
   document.getElementById('slotPanel').classList.toggle('hidden',tab!=='slots');
   document.getElementById('changePanel').classList.toggle('hidden',tab!=='changes');
   document.getElementById('patientPanel').classList.toggle('hidden',tab!=='patients');
-  if(tab==='slots')loadSlots();else if(tab==='changes')loadChangeRequests();else if(tab==='patients'){loadEmrPatients();loadFollowUps();}else render();
+  document.getElementById('paymentPanel').classList.toggle('hidden',tab!=='payment');
+  if(tab==='slots')loadSlots();else if(tab==='changes')loadChangeRequests();else if(tab==='patients'){loadEmrPatients();loadFollowUps();}else if(tab==='payment')loadPaymentSettings();else render();
 }
 function loadRequests(successNotice){
   document.getElementById('notice').textContent='Loading appointments…';
@@ -271,7 +310,7 @@ function priorityDeadlineText(requestedAt){
   return Date.now()>deadline.getTime()?'30-minute response target passed (due '+time+')':'30-minute response target · respond by '+time;
 }
 function render(){
-  if(currentTab==='slots'||currentTab==='changes')return;
+  if(currentTab==='slots'||currentTab==='changes'||currentTab==='payment')return;
   const items=data[currentTab]||[], root=document.getElementById('requestList');
   if(!items.length){root.innerHTML='<div class="card empty">No '+currentTab+' appointments.</div>';return;}
   root.innerHTML=items.map(x=>{
