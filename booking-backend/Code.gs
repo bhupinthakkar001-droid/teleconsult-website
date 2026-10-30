@@ -1,5 +1,5 @@
 const TIME_ZONE = 'Asia/Kolkata';
-const CONSENT_VERSION = 'telemedicine-privacy-v1-2026-10-30';
+const CONSENT_VERSION = 'telemedicine-privacy-v2-2026-10-30';
 const SLOTS_SHEET = 'Slots';
 const REQUESTS_SHEET = 'Requests';
 const REQUEST_HEADERS = [
@@ -8,7 +8,8 @@ const REQUEST_HEADERS = [
   'requestedAt', 'decisionAt', 'videoLink', 'calendarEventId',
   'presentingComplaint', 'medicalHistory', 'onlineConsultConsent', 'consentAt',
   'serviceLevel', 'consultationFee', 'responseTarget',
-  'dataUseConsent', 'dataConsentAt', 'consentVersion'
+  'dataUseConsent', 'dataConsentAt', 'consentVersion',
+  'paymentStatus', 'paymentReference', 'paymentSubmittedAt', 'paymentVerifiedAt', 'paymentAmount'
 ];
 
 function onOpen() {
@@ -62,6 +63,7 @@ function setupBookingSystem() {
     ensureServiceLevelColumns_(requests);
     ensureConsentColumns_(requests);
   }
+  ensurePaymentColumns_(requests);
 
   slots.setFrozenRows(1);
   requests.setFrozenRows(1);
@@ -107,6 +109,14 @@ function doGet(e) {
     }
     return jsonOutput(result);
   }
+  if (String(p.action || '') === 'paymentOptions') {
+    const payload=JSON.stringify({ok:true,payment:getPublicPaymentSettings_()});
+    const callback=String(p.callback||'');
+    if(callback && /^[A-Za-z_$][0-9A-Za-z_$]*$/.test(callback)) {
+      return ContentService.createTextOutput(callback+'('+payload+');').setMimeType(ContentService.MimeType.JAVASCRIPT);
+    }
+    return jsonOutput({ok:true,payment:getPublicPaymentSettings_()});
+  }
   if (String(p.action || '') === 'bookingOptions') {
     const payload=JSON.stringify({ok:true,priorityEnabled:getPriorityBookingsEnabled_()});
     const callback=String(p.callback||'');
@@ -148,6 +158,10 @@ function doPost(e) {
   const telemedicineConsentGiven = String(p.onlineConsultConsent || '') === 'yes';
   const dataUseConsentGiven = String(p.dataUseConsent || '') === 'yes';
   const serviceLevel = String(p.serviceLevel || 'REGULAR').toUpperCase();
+  const paymentReference = cleanPaymentReference_(p.paymentReference);
+  const paymentMade = String(p.paymentMade || '') === 'yes';
+  const paymentAmount = serviceLevel === 'PRIORITY' ? '2000' : '500';
+  const paymentSettings = getPublicPaymentSettings_();
   const doctorWhatsApp = PropertiesService.getScriptProperties().getProperty('DOCTOR_WHATSAPP') || '';
 
   if (name.length < 2) return receiptPage_('Check your name', 'Please enter your full name and try again.', '');
@@ -161,6 +175,9 @@ function doPost(e) {
   if (serviceLevel === 'PRIORITY' && !getPriorityBookingsEnabled_()) {
     return receiptPage_('Priority response option unavailable', 'Priority response bookings are temporarily unavailable. Please choose a regular consultation.', '');
   }
+  if (!paymentSettings.enabled) return receiptPage_('Online payment is not configured', 'Please contact the doctor before submitting a booking request. No appointment has been created.', '');
+  if (!paymentMade) return receiptPage_('Payment confirmation required', 'Please complete the UPI payment and confirm it before submitting your request.', '');
+  if (!/^[A-Z0-9]{6,40}$/.test(paymentReference)) return receiptPage_('Check your UPI reference', 'Enter the UPI transaction reference or UTR shown by your payment app. No appointment has been created.', '');
   if (!/^\d{10,15}$/.test(doctorWhatsApp)) return receiptPage_('Booking setup incomplete', 'The doctor is still setting up WhatsApp confirmation. Please try again later.', '');
 
   const lock = LockService.getScriptLock();
@@ -172,7 +189,7 @@ function doPost(e) {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     sheet = ss.getSheetByName(SLOTS_SHEET);
     const requests = ss.getSheetByName(REQUESTS_SHEET);
-    if (requests) { ensureIntakeColumns_(requests); ensureServiceLevelColumns_(requests); ensureConsentColumns_(requests); }
+    if (requests) { ensureIntakeColumns_(requests); ensureServiceLevelColumns_(requests); ensureConsentColumns_(requests); ensurePaymentColumns_(requests); }
     if (!sheet || !requests || sheet.getLastRow() < 2) {
       return receiptPage_('No appointment slots available', 'Please check again later or contact the doctor.', '');
     }
@@ -193,6 +210,12 @@ function doPost(e) {
       return receiptPage_('That slot is no longer available', 'Another patient may have requested this time. Please return to the website and choose another slot.', '');
     }
 
+    const existingRequestRows = requests.getDataRange().getDisplayValues();
+    for (let i = 1; i < existingRequestRows.length; i++) {
+      if (String(existingRequestRows[i][23] || '').trim().toUpperCase() === paymentReference) {
+        return receiptPage_('Reference already submitted', 'This UPI transaction reference has already been used. Please check the reference and contact the doctor if you believe this is an error.', '');
+      }
+    }
     const requestId = Utilities.getUuid().slice(0, 8).toUpperCase();
     const now = Utilities.formatDate(new Date(), TIME_ZONE, 'yyyy-MM-dd HH:mm:ss');
     sheet.getRange(rowIndex, 4, 1, 5).setValues([[
@@ -206,7 +229,8 @@ function doPost(e) {
       safeCell_(presentingComplaint), safeCell_(medicalHistory), 'YES', now,
       serviceLevel, serviceLevel === 'PRIORITY' ? '2000' : '500',
       serviceLevel === 'PRIORITY' ? '30-minute response' : 'Standard scheduling',
-      'YES', now, CONSENT_VERSION
+      'YES', now, CONSENT_VERSION,
+      'SUBMITTED', paymentReference, now, '', paymentAmount
     ]);
 
     const msg = [
@@ -224,9 +248,7 @@ function doPost(e) {
       'Please confirm or decline this request. I understand it is not confirmed until you approve it.'
     ].join('\n');
     const waUrl = 'https://wa.me/' + doctorWhatsApp + '?text=' + encodeURIComponent(msg);
-    const receiptMessage = serviceLevel === 'PRIORITY'
-      ? 'Your priority response request has been received. We will respond within 30 minutes. The fee is ₹2,000. Your selected slot is held as PENDING; the consultation is confirmed only after the doctor accepts it. This is not an emergency service.'
-      : 'Your regular request has been received and your slot is held as PENDING. The fee is ₹500. Your appointment is not confirmed until the doctor approves it. Tap below and press Send in WhatsApp.';
+    const receiptMessage = 'Your booking request and UPI transaction reference have been received. The fee submitted is ₹' + paymentAmount + '. Payment is awaiting manual verification by the doctor. Your slot is held as PENDING; the appointment and Google Meet link are not confirmed until payment is verified and the doctor approves the request.' + (serviceLevel === 'PRIORITY' ? ' Priority response target is within 30 minutes after a valid request is received; this is not an emergency service.' : '');
     return receiptPage_('Request received', receiptMessage, waUrl, requestId);
   } catch (err) {
     if (reserved && sheet && rowIndex > 1) {
@@ -275,9 +297,14 @@ function approveSelectedRequest() {
     ui.alert('Select a request row, not the header.');
     return;
   }
+  ensurePaymentColumns_(reqSheet);
   const req = reqSheet.getRange(row, 1, 1, Math.max(REQUEST_HEADERS.length, reqSheet.getLastColumn())).getDisplayValues()[0];
   if (String(req[7]).toUpperCase() !== 'PENDING') {
     ui.alert('This request is not pending.');
+    return;
+  }
+  if (String(req[22] || '').toUpperCase() !== 'VERIFIED') {
+    ui.alert('Verify the UPI payment from the doctor dashboard before approving this request.');
     return;
   }
 
@@ -534,6 +561,16 @@ function ensureConsentColumns_(sheet) {
   sheet.getRange('T:V').setNumberFormat('@');
 }
 
+function ensurePaymentColumns_(sheet) {
+  sheet.getRange(1, 23, 1, 5).setValues([['paymentStatus', 'paymentReference', 'paymentSubmittedAt', 'paymentVerifiedAt', 'paymentAmount']]);
+  sheet.getRange(1, 23, 1, 5).setFontWeight('bold');
+  sheet.getRange('W:AA').setNumberFormat('@');
+}
+
+function cleanPaymentReference_(value) {
+  return String(value || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 40);
+}
+
 function ensureServiceLevelColumns_(sheet) {
   sheet.getRange(1, 17, 1, 3).setValues([['serviceLevel', 'consultationFee', 'responseTarget']]);
   sheet.getRange(1, 17, 1, 3).setFontWeight('bold');
@@ -662,6 +699,7 @@ function adminGetRequests(token) {
   ensureIntakeColumns_(sheet);
   ensureServiceLevelColumns_(sheet);
   ensureConsentColumns_(sheet);
+  ensurePaymentColumns_(sheet);
   const rows = sheet.getRange(2, 1, sheet.getLastRow()-1, REQUEST_HEADERS.length).getDisplayValues();
   const pending = [], confirmed = [];
   rows.forEach((r, i) => {
@@ -669,7 +707,9 @@ function adminGetRequests(token) {
       patientPhone:r[5], visitType:r[6], status:r[7], requestedAt:r[8], videoLink:r[10],
       presentingComplaint:r[12], medicalHistory:r[13], onlineConsultConsent:r[14], consentAt:r[15],
       serviceLevel:r[16] || 'REGULAR', consultationFee:r[17] || '500', responseTarget:r[18] || 'Standard scheduling',
-      dataUseConsent:r[19], dataConsentAt:r[20], consentVersion:r[21]};
+      dataUseConsent:r[19], dataConsentAt:r[20], consentVersion:r[21],
+      paymentStatus:r[22] || 'NOT SUBMITTED', paymentReference:r[23] || '',
+      paymentSubmittedAt:r[24] || '', paymentVerifiedAt:r[25] || '', paymentAmount:r[26] || ''};
     if (r[7] === 'PENDING') pending.push(item);
     if (r[7] === 'CONFIRMED') confirmed.push(item);
   });
@@ -705,6 +745,9 @@ function processAdminRequest_(requestId, approve) {
       if (String(values[i][0]) === String(requestId)) { row=i+1; req=values[i]; break; }
     }
     if (!req || String(req[7]).toUpperCase() !== 'PENDING') throw new Error('This request is no longer pending.');
+    if (approve && String(req[22] || '').toUpperCase() !== 'VERIFIED') {
+      throw new Error('Payment is not verified yet. Compare the UPI reference in your bank or UPI app, then use Verify payment before approving.');
+    }
     const slotRows = slots.getDataRange().getDisplayValues();
     let slotRow = -1;
     for (let i=1; i<slotRows.length; i++) {
@@ -1535,6 +1578,73 @@ function consumePrescriptionHandoff_(handoffToken) {
     } catch (err) {
       return {ok:false,error:'The prescription handoff could not be read. Please create a new one.'};
     }
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+
+/* ---------------- UPI PAYMENT COLLECTION & MANUAL VERIFICATION ---------------- */
+function getPublicPaymentSettings_() {
+  const props = PropertiesService.getScriptProperties();
+  const upiId = String(props.getProperty('DOCTOR_UPI_ID') || '').trim();
+  const payeeName = String(props.getProperty('DOCTOR_UPI_NAME') || 'Dr. Bhupin Thakkar').trim();
+  const qrImageUrl = String(props.getProperty('DOCTOR_UPI_QR_URL') || '').trim();
+  return {enabled:!!upiId, upiId:upiId, payeeName:payeeName, qrImageUrl:qrImageUrl};
+}
+
+function adminGetPaymentSettings(token) {
+  requireAdminSession_(token);
+  return getPublicPaymentSettings_();
+}
+
+function adminSavePaymentSettings(token, settings) {
+  requireAdminSession_(token);
+  settings = settings || {};
+  const upiId = String(settings.upiId || '').trim();
+  const payeeName = cleanText_(settings.payeeName || 'Dr. Bhupin Thakkar', 60);
+  const qrImageUrl = String(settings.qrImageUrl || '').trim();
+  if (!/^[A-Za-z0-9._-]{2,100}@[A-Za-z0-9.-]{2,64}$/.test(upiId)) {
+    throw new Error('Enter a valid UPI ID, for example name@bank.');
+  }
+  if (qrImageUrl && (!/^https:\/\//i.test(qrImageUrl) || qrImageUrl.length > 500)) {
+    throw new Error('QR image URL must be a valid HTTPS link, or leave it blank.');
+  }
+  const props = PropertiesService.getScriptProperties();
+  props.setProperty('DOCTOR_UPI_ID', upiId);
+  props.setProperty('DOCTOR_UPI_NAME', payeeName || 'Dr. Bhupin Thakkar');
+  if (qrImageUrl) props.setProperty('DOCTOR_UPI_QR_URL', qrImageUrl);
+  else props.deleteProperty('DOCTOR_UPI_QR_URL');
+  return {ok:true, message:'UPI payment details saved. Refresh the patient website to display them.', payment:getPublicPaymentSettings_()};
+}
+
+function adminVerifyPayment(token, requestId) {
+  requireAdminSession_(token);
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(REQUESTS_SHEET);
+    if (!sheet || sheet.getLastRow() < 2) throw new Error('No booking requests were found.');
+    ensurePaymentColumns_(sheet);
+    const values = sheet.getDataRange().getDisplayValues();
+    let row = -1, req = null;
+    for (let i = 1; i < values.length; i++) {
+      if (String(values[i][0]) === String(requestId)) { row = i + 1; req = values[i]; break; }
+    }
+    if (!req || String(req[7]).toUpperCase() !== 'PENDING') throw new Error('This request is no longer pending.');
+    const reference = cleanPaymentReference_(req[23]);
+    if (!reference || reference.length < 6) throw new Error('No valid UPI transaction reference was submitted.');
+    for (let i = 1; i < values.length; i++) {
+      if (i + 1 !== row && cleanPaymentReference_(values[i][23]) === reference) {
+        throw new Error('This UPI reference is already attached to another booking. Do not verify it twice.');
+      }
+    }
+    const expectedAmount = String(req[16] || '').toUpperCase() === 'PRIORITY' ? '2000' : '500';
+    if (String(req[26] || '') !== expectedAmount) throw new Error('The submitted fee does not match the selected consultation amount.');
+    if (String(req[22] || '').toUpperCase() === 'VERIFIED') return {ok:true, message:'Payment is already marked verified.'};
+    const now = Utilities.formatDate(new Date(), TIME_ZONE, 'yyyy-MM-dd HH:mm:ss');
+    sheet.getRange(row, 23, 1, 5).setValues([['VERIFIED', reference, req[24] || now, now, expectedAmount]]);
+    return {ok:true, message:'Payment marked verified. You can now approve the appointment.'};
   } finally {
     lock.releaseLock();
   }
