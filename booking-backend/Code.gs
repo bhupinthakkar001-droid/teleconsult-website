@@ -1222,6 +1222,8 @@ function adminCreatePrescriptionHandoff(token, requestId, formPayload) {
       sex: cleanText_(p.sex,30),
       weight: cleanText_(p.weight,10)
     },
+    clinic: 'Dr. Bhupin Thakkar | Online Consultation',
+    doctor: 'Dr. Bhupin Thakkar, MBBS, DNB (Internal Medicine)',
     prescriptionDate: Utilities.formatDate(now,TIME_ZONE,'yyyy-MM-dd'),
     prescriptionTime: Utilities.formatDate(now,TIME_ZONE,'HH:mm'),
     clinical: clinicalParts.join('\n'),
