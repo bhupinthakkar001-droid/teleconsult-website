@@ -380,7 +380,9 @@ function renderEmrPrescriptions(items){
       (x.advice?'<p><strong>Advice:</strong> '+esc(x.advice)+'</p>':'')+
       (x.investigations?'<p><strong>Investigations:</strong> '+esc(x.investigations)+'</p>':'')+
       (x.followup?'<p><strong>Follow-up:</strong> '+esc(x.followup)+'</p>':'')+
-      '<p>Prescription ID: '+esc(x.prescriptionId)+'</p></article>';
+      '<p>Prescription ID: '+esc(x.prescriptionId)+'</p>'+
+      (x.pdfUrl?'<a class="action primary" href="'+esc(x.pdfUrl)+'" target="_blank" rel="noopener">Open saved PDF</a>':'<p class="muted">PDF not saved for this older prescription.</p>')+
+      '</article>';
   }).join('');
 }
 function saveEmrPatient(){
