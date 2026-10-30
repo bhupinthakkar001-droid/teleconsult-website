@@ -96,7 +96,7 @@ textarea{resize:vertical;min-height:76px;line-height:1.45}
       <input type="hidden" name="slotId" id="slotId" value="">
       <div><label for="patientName">Your name</label><input id="patientName" name="patientName" required autocomplete="name" maxlength="80" placeholder="Full name"></div>
       <div><label for="phone">Mobile number</label><input id="phone" name="phone" type="tel" required autocomplete="tel" inputmode="tel" maxlength="18" placeholder="Phone number"></div>
-      <div><label for="serviceLevel">Consultation option</label><select id="serviceLevel" name="serviceLevel" required><option value="REGULAR">Regular consultation · ₹500</option><option value="PRIORITY" hidden disabled>Priority response consultation · ₹2,000</option></select></div>
+      <div><label for="serviceLevel">Consultation option</label><select id="serviceLevel" name="serviceLevel" required><option value="REGULAR">Regular consultation · ₹500</option><option value="PRIORITY">Priority response consultation · ₹2,000</option></select></div>
       <div class="service-info" id="serviceInfo"><strong>Regular consultation · ₹500</strong><br>Choose any available appointment date and time. Payment arrangements will be confirmed directly by the doctor.</div>
       <div class="fields">
         <div><label for="date">Available date</label><select id="date" name="date" required disabled><option value="">Loading slots…</option></select></div>
@@ -246,9 +246,11 @@ function updateTimes(){
   if(!slots.length)timeSelect.innerHTML='<option value="">No times available</option>';
 }
 function loadBookingOptions(){
-  if(!apiReady){priorityOption.hidden=true;priorityOption.disabled=true;return;}
+  if(!apiReady){return;}
   window.receiveTeleconsultBookingOptions=function(payload){
-    const enabled=!!(payload&&payload.ok&&payload.priorityEnabled);
+    // Hide only on an explicit server response saying priority is OFF.
+    if(!payload || payload.ok!==true || typeof payload.priorityEnabled!=='boolean')return;
+    const enabled=payload.priorityEnabled;
     priorityOption.hidden=!enabled;
     priorityOption.disabled=!enabled;
     if(!enabled && serviceLevelSelect.value==='PRIORITY'){
@@ -258,7 +260,7 @@ function loadBookingOptions(){
   };
   const script=document.createElement('script');
   script.src=BOOKING_API_URL+'?action=bookingOptions&callback=receiveTeleconsultBookingOptions&_='+Date.now();
-  script.onerror=()=>{priorityOption.hidden=true;priorityOption.disabled=true;};
+  script.onerror=()=>{ /* Keep option visible; the booking server validates availability on submission. */ };
 }
 function slotsForSelectedService(){
   return availableSlots;
