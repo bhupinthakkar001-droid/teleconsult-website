@@ -36,6 +36,16 @@
     .priority-card{border:2px solid #d18b32;background:#fffdf8}
     .priority-label{display:inline-flex;align-items:center;background:#fff0d5;color:#89520b;border-radius:99px;padding:5px 10px;font-size:11px;font-weight:800}
     .priority-meta{color:#89520b;font-size:13px;font-weight:750;margin:7px 0}
+    .consult-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 12px}
+    .consult-field{min-width:0}.consult-field.full{grid-column:1/-1}
+    .consult-field label{display:block;font-size:13px;font-weight:700;margin-top:7px}
+    .consult-field input,.consult-field textarea,.consult-field select{width:100%;padding:11px;border:1px solid var(--line);border-radius:10px;font:inherit;margin:6px 0 10px;background:white}
+    .consult-field textarea{min-height:84px;resize:vertical}
+    .consult-summary{background:#f5f8f5;border:1px solid var(--line);padding:12px;border-radius:12px;margin:10px 0 14px}
+    .consult-generator{background:#f8faf8;border:1px solid var(--line);padding:14px;border-radius:14px;margin:14px 0}
+    .consult-generator .row{margin-top:10px}
+    .consult-status{font-size:13px;color:var(--green);margin:8px 0}
+    @media(max-width:520px){.consult-grid{grid-template-columns:1fr}.consult-field.full{grid-column:auto}}
     @media(max-width:420px){.slot-grid{grid-template-columns:1fr}.slot-form-actions{flex-direction:column}}
   </style>
 </head>
@@ -86,10 +96,52 @@
       <div id="slotList"></div>
       <button class="secondary full" type="button" onclick="loadSlots()">Refresh slots</button>
     </section>
+    <section id="consultationPanel" class="hidden">
+      <div class="card">
+        <div class="row" style="justify-content:space-between;align-items:center">
+          <div><h2>Consultation workspace</h2><div class="muted">Private clinical note linked to this confirmed appointment</div></div>
+          <button class="secondary" type="button" onclick="closeConsultation()">Back</button>
+        </div>
+        <div id="consultationPatientSummary" class="consult-summary"></div>
+        <div id="consultationNotice" class="consult-status">Loading consultation record…</div>
+        <div class="consult-grid">
+          <div class="consult-field"><label for="consultAge">Age</label><input id="consultAge" type="number" min="0" max="120" inputmode="numeric" placeholder="Age in years"></div>
+          <div class="consult-field"><label for="consultSex">Sex</label><select id="consultSex"><option value="">Not recorded</option><option>Female</option><option>Male</option><option>Other</option></select></div>
+          <div class="consult-field full"><label for="consultAllergies">Known allergies</label><textarea id="consultAllergies" placeholder="Drug / food allergies or no known allergies"></textarea></div>
+          <div class="consult-field full"><label for="consultMedicines">Current medicines</label><textarea id="consultMedicines" placeholder="Medicine, dose and frequency, if known"></textarea></div>
+          <div class="consult-field"><label for="consultBP">Blood pressure</label><input id="consultBP" placeholder="e.g. 120/80 mmHg"></div>
+          <div class="consult-field"><label for="consultPulse">Pulse</label><input id="consultPulse" placeholder="beats/min"></div>
+          <div class="consult-field"><label for="consultRR">Respiratory rate</label><input id="consultRR" placeholder="breaths/min"></div>
+          <div class="consult-field"><label for="consultTemp">Temperature</label><input id="consultTemp" placeholder="°C"></div>
+          <div class="consult-field"><label for="consultSpO2">SpO₂</label><input id="consultSpO2" placeholder="% (mention oxygen if applicable)"></div>
+          <div class="consult-field"><label for="consultWeight">Weight</label><input id="consultWeight" placeholder="kg"></div>
+          <div class="consult-field"><label for="consultHeight">Height</label><input id="consultHeight" placeholder="cm"></div>
+          <div class="consult-field full"><label for="consultHistory">Clinical history</label><textarea id="consultHistory" style="min-height:110px" placeholder="Relevant history, symptoms, onset, duration and review of systems"></textarea></div>
+          <div class="consult-field full"><label for="consultExam">Examination / video assessment</label><textarea id="consultExam" placeholder="Relevant examination and limitations of remote assessment"></textarea></div>
+          <div class="consult-field full"><label for="consultDiagnosis">Assessment / diagnosis</label><textarea id="consultDiagnosis" placeholder="Clinical assessment and differential diagnosis, as appropriate"></textarea></div>
+          <div class="consult-field full"><label for="consultInvestigations">Investigations advised</label><textarea id="consultInvestigations" placeholder="Tests, imaging or reports requested"></textarea></div>
+          <div class="consult-field full"><label for="consultPlan">Treatment plan</label><textarea id="consultPlan" style="min-height:110px" placeholder="Treatment, advice and safety-net instructions"></textarea></div>
+          <div class="consult-field full"><label for="consultFollowup">Follow-up advice</label><textarea id="consultFollowup" placeholder="When to follow up and when in-person / emergency evaluation is needed"></textarea></div>
+          <div class="consult-field"><label for="consultFollowupDate">Follow-up date (optional)</label><input id="consultFollowupDate" type="date"></div>
+        </div>
+        <div class="row" style="margin-top:10px">
+          <button class="secondary" id="saveConsultationBtn" type="button" onclick="saveConsultation('DRAFT')">Save draft</button>
+          <button class="primary" id="completeConsultationBtn" type="button" onclick="saveConsultation('COMPLETED')">Mark consultation completed</button>
+        </div>
+        <div class="consult-generator">
+          <strong>Prescription generator</strong>
+          <div class="muted">Open your existing prescription app in a separate tab. Copy the consultation details here, then paste the relevant information into the generator. Patient details are not sent to the generator automatically.</div>
+          <div class="row">
+            <a class="action primary" href="https://ai-clinic-app-mu3y.onrender.com/" target="_blank" rel="noopener">Open prescription generator</a>
+            <button class="secondary" type="button" onclick="copyPrescriptionContext()">Copy details for prescription</button>
+          </div>
+        </div>
+      </div>
+    </section>
   </section>
 </div>
 <script>
-let sessionToken='', currentTab='pending', data={pending:[],confirmed:[]}, slotsData=[], editingSlotId='', changeRequests=[], priorityEnabled=true;
+let sessionToken='', currentTab='pending', data={pending:[],confirmed:[]}, slotsData=[], editingSlotId='', changeRequests=[], priorityEnabled=true, currentConsultationBooking=null;
 function showError(id,msg){document.getElementById(id).textContent=msg||''}
 function login(){
   const btn=document.getElementById('loginBtn');btn.disabled=true;btn.textContent='Signing in…';showError('loginError','');
@@ -144,6 +196,9 @@ function togglePriorityBookings(){
   }).adminSetPriorityBookingsEnabled(sessionToken,next);
 }
 function showTab(tab){
+  document.getElementById('consultationPanel').classList.add('hidden');
+  document.querySelector('.tabs').classList.remove('hidden');
+  document.getElementById('priorityControl').classList.remove('hidden');
   currentTab=tab;
   document.getElementById('pendingTab').classList.toggle('active',tab==='pending');
   document.getElementById('confirmedTab').classList.toggle('active',tab==='confirmed');
@@ -188,12 +243,13 @@ function render(){
       const msg=confirmationMessage(x);
       const wa='https://wa.me/'+phone+'?text='+encodeURIComponent(msg);
       actions='<div class="row" style="margin-top:14px">'+
+        '<button class="primary" type="button" onclick="openConsultation(\\''+esc(x.requestId)+'\\')">Open consultation</button>'+
         '<a class="action primary" target="_blank" rel="noopener" href="'+esc(x.videoLink)+'">Open Google Meet</a>'+
         '<a class="action whatsapp" target="_blank" rel="noopener" href="'+esc(wa)+'">Send WhatsApp</a>'+
         '<button class="secondary" type="button" onclick="copySms(\''+esc(x.requestId)+'\')">Copy SMS message</button>'+
         '</div>';
     } else if(currentTab==='confirmed') {
-      actions='<p class="meta">Meet link is not available for this appointment. Please check the Requests sheet.</p>';
+      actions='<div class="row" style="margin-top:14px"><button class="primary" type="button" onclick="openConsultation(\\''+esc(x.requestId)+'\\')">Open consultation</button></div><p class="meta">Meet link is not available for this appointment. Please check the Requests sheet.</p>';
     } else {
       const approveText=isPriority?'Accept priority & create Meet':'Approve & create Meet';
       actions='<div class="row" style="margin-top:14px"><button class="primary" onclick="decide(\''+esc(x.requestId)+'\',true)">'+approveText+'</button><button class="danger" onclick="decide(\''+esc(x.requestId)+'\',false)">Decline</button></div>';
@@ -208,6 +264,106 @@ function render(){
     return '<article class="'+cardClass+'"><div class="row" style="justify-content:space-between;align-items:center"><div class="name">'+esc(x.patientName)+'</div><span class="pill">'+esc(x.status)+'</span></div><div class="meta">'+esc(x.date)+' · '+esc(x.time)+'</div><div class="meta">'+esc(x.visitType)+'</div><div class="meta">Mobile: '+esc(x.patientPhone)+'</div><div class="meta small">Request ID: '+esc(x.requestId)+'</div>'+service+intake+actions+'</article>';
   }).join('');
 }
+
+const consultationFields = {
+  age:'consultAge', sex:'consultSex', allergies:'consultAllergies',
+  currentMedicines:'consultMedicines', bloodPressure:'consultBP', pulse:'consultPulse',
+  respiratoryRate:'consultRR', temperature:'consultTemp', spo2:'consultSpO2',
+  weight:'consultWeight', height:'consultHeight', clinicalHistory:'consultHistory',
+  examination:'consultExam', assessmentDiagnosis:'consultDiagnosis',
+  investigations:'consultInvestigations', treatmentPlan:'consultPlan',
+  followUpAdvice:'consultFollowup', followUpDate:'consultFollowupDate'
+};
+function openConsultation(requestId){
+  const booking=(data.confirmed||[]).find(x=>String(x.requestId)===String(requestId));
+  if(!booking){document.getElementById('notice').textContent='Refresh confirmed appointments and try again.';return;}
+  document.querySelector('.tabs').classList.add('hidden');
+  document.getElementById('priorityControl').classList.add('hidden');
+  document.getElementById('requestList').classList.add('hidden');
+  document.getElementById('requestRefresh').classList.add('hidden');
+  document.getElementById('changePanel').classList.add('hidden');
+  document.getElementById('slotPanel').classList.add('hidden');
+  document.getElementById('consultationPanel').classList.remove('hidden');
+  document.getElementById('consultationNotice').textContent='Loading saved clinical note…';
+  document.getElementById('consultationPatientSummary').textContent=
+    booking.patientName+' · '+booking.patientPhone+' · '+booking.date+' at '+booking.time+
+    ' · '+booking.visitType+' · Request '+booking.requestId+
+    (booking.presentingComplaint?' · Presenting problem: '+booking.presentingComplaint:'');
+  currentConsultationBooking=booking;
+  Object.values(consultationFields).forEach(id=>{document.getElementById(id).value='';});
+  google.script.run.withSuccessHandler(r=>{
+    if(!r || !r.ok) {document.getElementById('consultationNotice').textContent='Could not load this consultation record.';return;}
+    currentConsultationBooking=r.booking||booking;
+    const saved=r.consultation||{};
+    Object.keys(consultationFields).forEach(key=>{
+      document.getElementById(consultationFields[key]).value=saved[key]||'';
+    });
+    document.getElementById('consultationNotice').textContent=
+      saved.noteStatus==='COMPLETED'?'Saved record · Marked completed'+(saved.updatedAt?' · '+saved.updatedAt:''):
+      saved.updatedAt?'Saved draft · Last updated '+saved.updatedAt:'New consultation note · Not yet saved';
+  }).withFailureHandler(e=>{
+    document.getElementById('consultationNotice').textContent=e.message||String(e);
+  }).adminGetConsultation(sessionToken,requestId);
+}
+function closeConsultation(){
+  currentConsultationBooking=null;
+  showTab('confirmed');
+}
+function saveConsultation(status){
+  if(!currentConsultationBooking){document.getElementById('consultationNotice').textContent='No appointment is selected.';return;}
+  const payload={};
+  Object.keys(consultationFields).forEach(key=>{
+    payload[key]=document.getElementById(consultationFields[key]).value||'';
+  });
+  const draftBtn=document.getElementById('saveConsultationBtn');
+  const completeBtn=document.getElementById('completeConsultationBtn');
+  draftBtn.disabled=true;completeBtn.disabled=true;
+  document.getElementById('consultationNotice').textContent='Saving clinical note…';
+  google.script.run.withSuccessHandler(r=>{
+    draftBtn.disabled=false;completeBtn.disabled=false;
+    document.getElementById('consultationNotice').textContent=r.message+' Updated: '+r.updatedAt;
+  }).withFailureHandler(e=>{
+    draftBtn.disabled=false;completeBtn.disabled=false;
+    document.getElementById('consultationNotice').textContent=e.message||String(e);
+  }).adminSaveConsultation(sessionToken,currentConsultationBooking.requestId,payload,status);
+}
+function copyPrescriptionContext(){
+  if(!currentConsultationBooking)return;
+  const b=currentConsultationBooking;
+  const labels={
+    age:'Age',sex:'Sex',allergies:'Allergies',currentMedicines:'Current medicines',
+    bloodPressure:'Blood pressure',pulse:'Pulse',respiratoryRate:'Respiratory rate',
+    temperature:'Temperature',spo2:'SpO2',weight:'Weight',height:'Height',
+    clinicalHistory:'Clinical history',examination:'Examination / video assessment',
+    assessmentDiagnosis:'Assessment / diagnosis',investigations:'Investigations',
+    treatmentPlan:'Treatment plan',followUpAdvice:'Follow-up advice',followUpDate:'Follow-up date'
+  };
+  const output=[
+    'Patient: '+(b.patientName||''),
+    'Appointment: '+(b.appointmentDate||b.date||'')+' '+(b.appointmentTime||b.time||''),
+    'Consultation type: '+(b.visitType||''),
+    'Presenting complaint: '+(b.presentingComplaint||'')
+  ];
+  Object.keys(consultationFields).forEach(key=>{
+    const value=String(document.getElementById(consultationFields[key]).value||'').trim();
+    if(value)output.push(labels[key]+': '+value);
+  });
+  copyClinicalText(output.join('\n'));
+}
+function copyClinicalText(value){
+  const fallback=()=>{
+    const area=document.createElement('textarea');area.value=value;area.style.position='fixed';area.style.opacity='0';document.body.appendChild(area);area.focus();area.select();
+    try{document.execCommand('copy');document.getElementById('consultationNotice').textContent='Consultation details copied. Paste them into the prescription generator and verify every field before issuing.';}
+    catch(e){document.getElementById('consultationNotice').textContent='Copy failed. Please select and copy the details manually.';}
+    area.remove();
+  };
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(value).then(()=>{
+      document.getElementById('consultationNotice').textContent='Consultation details copied. Paste them into the prescription generator and verify every field before issuing.';
+    }).catch(fallback);
+  }else fallback();
+}
+
 function loadChangeRequests(){
   document.getElementById('notice').textContent='Loading change requests…';
   google.script.run.withSuccessHandler(r=>{
