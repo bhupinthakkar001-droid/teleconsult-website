@@ -1098,7 +1098,7 @@ function ensureEmrSheets_() {
     patients.getRange(1,1,1,EMR_PATIENT_HEADERS.length).setValues([EMR_PATIENT_HEADERS]);
     patients.setFrozenRows(1);
     patients.getRange(1,1,1,EMR_PATIENT_HEADERS.length).setFontWeight('bold');
-    patients.getRange('A:O').setNumberFormat('@');
+    patients.getRange('A:Q').setNumberFormat('@');
   } else if (String(patients.getRange(1,1).getDisplayValue()) !== 'patientId') {
     throw new Error('Patients sheet exists with an unexpected layout. Do not edit it manually.');
   }
@@ -1233,7 +1233,7 @@ function adminSavePatientRecord(token, patientId, payload) {
     const rows=sheets.patients.getLastRow()<2?[]:sheets.patients.getRange(2,1,sheets.patients.getLastRow()-1,EMR_PATIENT_HEADERS.length).getDisplayValues();
     let target=-1,createdAt=now;
     for(let i=0;i<rows.length;i++){
-      if(String(rows[i][0])===record.patientId){target=i+2;createdAt=String(rows[i][13]||now);break;}
+      if(String(rows[i][0])===record.patientId){target=i+2;createdAt=String(rows[i][15]||now);break;}
     }
     record.createdAt=createdAt;record.updatedAt=now;
     const row=EMR_PATIENT_HEADERS.map(h=>safeCell_(record[h]||''));
